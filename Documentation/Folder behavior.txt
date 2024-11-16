@@ -1,0 +1,53 @@
+How converter functions *should* handle the extraction/packing
+
+TXR > BMP/PNG
+
+convertTXRtoBMP(input, output, png_output=False)
+
+Set png_output=True to export PNG(s) instead
+
+Convert specific TXR and put BMP(s) in output folder:
+input = "./folder/texture.txr"
+output = "./another folder/"
+
+Convert specific TXR and put BMP(s) in the same folder:
+input = "./folder/texture.txr"
+output = ""
+
+Convert all TXR in input folder and put BMP(s) in differemt folder:
+input = "./folder/"
+output = "./another folder/"
+
+Convert all TXR in input folder and put BMP(s) in the same folder:
+input = "./folder/"
+output = ""
+
+
+
+BMP/PNG > TXR
+
+convertBMPtoTXR(input, output, png_input=False)
+
+Set png_input=True to convert PNG(s) instead
+
+Convert specific bmp from input folder into specific txr/bg in output folder:
+input = "./folder/image.txr.0.bmp"
+output = "./another folder/image.txr"
+or
+input = "./folder/image.bg.0.bmp"
+output = "./another folder/image.bg" for .bg loading screen file
+
+Convert specific bmp in input folder and put txr in output folder:
+input = "./folder/image.bmp"
+output = "./another folder/"
+
+Convert specific bmp in input folder and put txr in the same folder:
+input = "./folder/texture.bmp"
+output = ""
+
+Convert all bmp in input folder and put txr(s) in the same folder:
+input = "./folder/"
+output = ""
+It will also group BMPs into separate TXR's based on the file names.
+texture_name.txr.X.bmp -> texture_name.txr
+X shows the order in which textures will be placed in the txr

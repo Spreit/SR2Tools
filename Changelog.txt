@@ -1,0 +1,53 @@
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
+  Sega Rally 2 Tools Changelog
+
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
+v0.6 - 
+- 3D support
+
+v0.5.0 - 2024-11-16
+- Actually functional UI
+- PNG <> BMP conversion
+- PNG export
+- Tons of other things I forgor, deserves skipping a version
+
+v0.3.5 - 2024-10-??
+- Crude, but functional UI
+- Color space conversion (fixes PNG transparency issues)
+- Converter functions reformatting
+- Project restructuring
+
+v0.3.1 - 2024-09-??
+- Total texture handling restructure
+- SARC extraction support
+- Partial MTEX extraction support
+
+~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
+v0.3 - 2024-09-04
+ - Proper BMP > TXR/BG converter
+ - Automatic BMP<>TXR/BG vertical flipping
+ - Smart path input (may not work properly)
+ - Code cleanup and restructuring
+
+v0.2.7 - 2024-09-01
+ - Full Full TXR extraction support (the few paletted textures are now extracted correctly)
+ - Code cleanup and restructuring
+
+v0.2.5 - 2024-08-30
+ - Full TXR extraction support (.sky, .sea and .tyk are now extractable)
+
+v0.2 - 2024-08-30
+ - Better header and file handling
+ - 2/4 TXR support, now with file splitting and color format detection
+ - BMP > BG conversion is ommited
+ - Extracted BMPs are no longer upside down
+
+v0.1 - 2024-08-29
+ - More user friendly code interface
+ - BG<>BMP conversion
+ - 1.5/4 TXR support
