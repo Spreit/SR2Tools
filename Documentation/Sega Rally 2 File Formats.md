@@ -139,7 +139,7 @@ Sub-Texture Pixel Bytes
 
 <a name="RTXRFormat"></a>
 ## RTXR Format Structure
-Used in like 0.5 textures in dreamcast versions (taco.txr)
+Used in like 0.5 textures in dreamcast versions (taco.txr and menu car textures)
 
 Unlike RTEX, stores pairs of Header + Pixel Bytes one after another.
 
