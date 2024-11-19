@@ -93,6 +93,15 @@ class SR2Texture:
 
         self.pixel_bytes_list = []
 
+    def unpack_from_bytes(self, texture_file_bytes):
+        pass
+
+    def unpack_from_file(self, texture_file_path):
+        texture_file = open(texture_file_path, "r+b")
+        texture_file_bytes = texture_file.read()
+        texture_file.close()
+        self.unpack_from_bytes(texture_file_bytes)
+
     def pack_and_give(self):
         return b''
 
@@ -124,10 +133,6 @@ class RHBG(SR2Texture):
 
         pyxel_bytes = file_bytes[self.file_header_size + self.texture_header_size:]
         self.pixel_bytes_list.append(pyxel_bytes)
-
-    def unpack_from_file(self, texture_file_path):
-        file_bytes = open(texture_file_path, "r+b").read()
-        self.unpack_from_bytes(file_bytes)
 
     def pack_and_give(self):
         file_header_bytes = struct.pack(self.file_header_formatting, *self.file_header.values())
@@ -169,6 +174,8 @@ class RHBG(SR2Texture):
 class RTEX(SR2Texture):
 
     def __init__(self):
+        self.file_header_size = 16
+        self.subtexture_header_size = 16
         self.palette_list = []
         SR2Texture.__init__(self, b'RTEX')
 
@@ -194,40 +201,55 @@ class RTEX(SR2Texture):
         self.pixel_bytes_list.append(pixel_bytes)
         self.file_header["Texture Count"] += 1
 
-    def unpack_from_file(self, texture_file_path):
-        texture_file = open(texture_file_path, "r+b")
-
+    def fill_file_header_from_bytes(self, texture_file_bytes):
+        file_header_bytes = texture_file_bytes[:self.file_header_size]
         self.file_header = fill_dict_from_bytes_by_format(self.file_header,
-                                                          texture_file.read(self.file_header_size),
+                                                          file_header_bytes,
                                                           self.file_header_formatting)
 
+    def fill_subtexture_header_list_from_bytes(self, texture_file_bytes):
+        subtexture_header_list_bytes = texture_file_bytes[self.file_header_size:
+                                                          self.file_header_size
+                                                          + self.file_header["Texture Count"] * self.subtexture_header_size]
         # Fill texture_header_list
         for i in range(self.file_header["Texture Count"]):
-            texture_specific_header = fill_dict_from_bytes_by_format(self.texture_header,
-                                                                     texture_file.read(self.texture_header_size),
-                                                                     self.texture_header_formatting)
+            subtexture_header_bytes = subtexture_header_list_bytes[i*self.subtexture_header_size:
+                                                                   i*self.subtexture_header_size + self.subtexture_header_size]
+            subtexture_header = fill_dict_from_bytes_by_format(self.texture_header,
+                                                               subtexture_header_bytes,
+                                                               self.texture_header_formatting)
             # dict.copy, because python uses a reference when it doesn't need to
-            self.texture_header_list.append(dict.copy(texture_specific_header))
+            self.texture_header_list.append(dict.copy(subtexture_header))
+
+    def unpack_from_bytes(self, texture_file_bytes):
+
+        self.fill_file_header_from_bytes(texture_file_bytes)
+        self.fill_subtexture_header_list_from_bytes(texture_file_bytes)
 
         # Fill palette_list
         palette_count = self.file_header["Palette Count"]
         if palette_count > 0:
+            palette_offset = self.file_header_size + self.subtexture_header_size * self.file_header["Texture Count"]
+
             palette_size = 1024
             for i in range(0, palette_count):
-                self.palette_list.append(texture_file.read(palette_size))
+                self.palette_list.append(texture_file_bytes[palette_offset + i * palette_size:
+                                                            palette_offset + i * palette_size + palette_size])
 
-            if palette_count >= 2:
+            if palette_count >= 1:
                 self.file_header["Palette Index 1"] = 1
+            if palette_count >= 2:
                 self.file_header["Palette Index 2"] = 2
             if palette_count == 3:
                 self.file_header["Palette Index 3"] = 3
 
         # Fill pixel_bytes_list
-        pixel_data_offset = 0x1000
-        texture_file.seek(pixel_data_offset)
+        pixel_bytes_offset = 0x1000
         for texture_header in self.texture_header_list:
-            texture_bytes = texture_file.read(texture_header["Image Size (in bytes)"])
+            texture_bytes = texture_file_bytes[pixel_bytes_offset:
+                                               pixel_bytes_offset + texture_header["Image Size (in bytes)"]]
             self.pixel_bytes_list.append(texture_bytes)
+            pixel_bytes_offset += texture_header["Image Size (in bytes)"]
 
     def pack_and_give(self):
 
@@ -254,7 +276,8 @@ class RTEX(SR2Texture):
         current_subtexture_header = self.texture_header_list[texture_id]
         output_bmp = BMP()
 
-        output_bmp.set_resolution(current_subtexture_header["Image Width"], current_subtexture_header["Image Width"])
+        output_bmp.set_resolution(current_subtexture_header["Image Width"],
+                                  current_subtexture_header["Image Width"])
 
         output_bmp.image_header["BPP"] = 16
         if current_subtexture_header["Color Format"] == 2:
@@ -455,33 +478,46 @@ class RTXR(SR2Texture):
         # Uses unknown compression
         SR2Texture.__init__(self, b'RTXR')
 
-    def unpack_from_file(self, texture_file_path):
-        texture_file = open(texture_file_path, "r+b")
+    def uncompress_pixel_bytes(self):
+        pass
+
+    def unpack_from_bytes(self, texture_file_bytes):
 
         self.file_header = fill_dict_from_bytes_by_format(self.file_header,
-                                                          texture_file.read(self.file_header_size),
+                                                          texture_file_bytes[self.file_header_size:],
                                                           self.file_header_formatting)
+
         print(self.file_header)
+        texture_offset = self.file_header_size
         # Fill texture_header_list and pixel_bytes_list
         for i in range(self.file_header["Texture Count"]):
             texture_header = fill_dict_from_bytes_by_format(self.texture_header,
-                                                            texture_file.read(self.texture_header_size),
+                                                            texture_file_bytes[texture_offset:
+                                                                               texture_offset+self.texture_header_size],
                                                             self.texture_header_formatting)
             # dict.copy, because python uses a reference when it doesn't need to
             self.texture_header_list.append(dict.copy(texture_header))
             print(texture_header)
 
-            texture_bytes = texture_file.read(texture_header["Image Size (in bytes)"])
+            texture_offset += self.texture_header_size
+
+            texture_bytes = texture_file_bytes[texture_offset:
+                                               texture_offset + texture_header["Image Size (in bytes)"]]
             self.pixel_bytes_list.append(texture_bytes)
 
+            texture_offset += texture_header["Image Size (in bytes)"]
+
     def pack_and_give(self):
+        # Texture Header and Compressed Pixel Bytes are stored in pairs
 
         file_header_bytes = struct.pack(self.file_header_formatting, *self.file_header.values())
 
         texture_header_and_pixel_bytes = b''
         for i in range(len(self.texture_header_list)):
-            texture_header_and_pixel_bytes += struct.pack(self.texture_header_formatting,
+            texture_header_bytes = struct.pack(self.texture_header_formatting,
                                                           *self.texture_header_list[i].values())
-            texture_header_and_pixel_bytes += self.pixel_bytes_list[i]
+            compressed_pixel_bytes = self.pixel_bytes_list[i]
+
+            texture_header_and_pixel_bytes += (texture_header_bytes + compressed_pixel_bytes)
 
         return file_header_bytes + texture_header_and_pixel_bytes
