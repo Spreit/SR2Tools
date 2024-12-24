@@ -7,7 +7,15 @@
 ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
 v0.6 - 
-- 3D support
+- 3D support ?
+
+v0.5.2 - 2024-12-XX
+- Fixed PNG flipping
+- Kinda full MTEX export (thanks to chmcl)
+
+v0.5.1 - 2024-12-24
+- Unpacking and packing of BIN files
+- EXE and DLL patching to make edited BIN files work
 
 v0.5.0 - 2024-11-16
 - Actually functional UI

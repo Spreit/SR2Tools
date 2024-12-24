@@ -72,6 +72,10 @@ def convertARGB8888toRGBA1555bytes(color_array) -> bytes:
 
             try:
                 alpha_value = pixel[3]
+
+                if alpha_value > 0:
+                    alpha_value = 255
+
             except:
                 alpha_value = 255
 

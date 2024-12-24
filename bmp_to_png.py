@@ -42,7 +42,6 @@ def BMPtoPNG(unpacked_bmp: BMP) -> Image:
             png_pixel_array.append(pixel_array)
     else:
         if bmp_bpp == 16:
-
             if bmp_color_format == "RGB565":
                 png_pixel_array = convertRGB565toRGBA8888(bmp_pixel_bytes)
             elif bmp_color_format == "ARGB1555":
@@ -74,7 +73,6 @@ def BMPtoPNG(unpacked_bmp: BMP) -> Image:
 
     png_pixel_array = numpy.array(png_pixel_array, dtype=numpy.uint8)
     png_pixel_array = png_pixel_array.reshape(abs(height), width, color_channel_count)
-
     png_pixel_array = numpy.flip(png_pixel_array, 0)
 
     png_output = Image.fromarray(png_pixel_array)
@@ -87,7 +85,7 @@ def PNGtoBMP(unpacked_png, output_color_format) -> BMP:
     png_array = numpy.asarray(unpacked_png)
     numpy.flip(png_array)
     png_array = png_array.tolist()
-    png_array = png_array[::-1]
+    #png_array = png_array[::-1]
 
     converted_pixel_bytes = b''
 

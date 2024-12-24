@@ -1,6 +1,7 @@
 # Classes of SR2 texture formats
 import struct
 from bmp_handler import *
+from unyakuza import uncompress_SR2_subtexture
 
 def fill_dict_from_bytes_by_format(dictionary: dict, source_bytes: bytes, formatting: str) -> dict:
     value_list = struct.unpack(formatting, source_bytes)
@@ -68,7 +69,7 @@ sr2_texture_formats = {
         "Texture Header Formatting": "<I2H2I",
         "Texture Header": {
             "Color Format": 0,
-            "No Idea": 0,
+            "Compressed": 0,  # 0 - as is, 1 - Yakuza'ed
             "Image Width": 0,
             "Pixel Offset": 0,
             "Image Size (in bytes)": 0,
@@ -338,83 +339,148 @@ class MTEX(SR2Texture):
     def __init__(self):
         self.tile_list = []
         self.index_list = []
+        self.palette_list = []
         self.index_counter = 0  # For correct tile unpacking
-        SR2Texture.__init__(self,b'MTEX')
+        SR2Texture.__init__(self, b'MTEX')
 
-    def add_palette(self, palette_bytes):
-        pass
+    def add_palette_if_present(self, full_header_bytes):
+        for texture_header in self.texture_header_list:
+            if texture_header["Color Format"] > 1024 and len(self.palette_list) == 0:
+                palette_bytes = full_header_bytes[0x400:0x800]
+                self.palette_list.append(palette_bytes)
+                break
 
     def add_texture(self, generic_texture_header, pixel_bytes):
         self.texture_header_list.append(generic_texture_header)
         self.pixel_bytes_list.append(pixel_bytes)
         self.file_header["Texture Count"] += 1
 
-    def unpack_from_file(self, texture_file_path):
-        texture_file = open(texture_file_path, "r+b")
+    def unpack_from_bytes(self, texture_file_bytes):
 
+        file_header_bytes = texture_file_bytes[:self.file_header_size]
         self.file_header = fill_dict_from_bytes_by_format(self.file_header,
-                                                          texture_file.read(self.file_header_size),
+                                                          file_header_bytes,
                                                           self.file_header_formatting)
-        # print(self.file_header)
+
+        texture_headers_offset = self.file_header_size
         # Fill texture_header_list
         for i in range(self.file_header["Texture Count"]):
-            texture_specific_header = fill_dict_from_bytes_by_format(self.texture_header,
-                                                                     texture_file.read(self.texture_header_size),
-                                                                     self.texture_header_formatting)
+            subtexture_header_bytes = texture_file_bytes[texture_headers_offset:
+                                                         texture_headers_offset + self.texture_header_size]
+
+            subtexture_header = fill_dict_from_bytes_by_format(self.texture_header,
+                                                               subtexture_header_bytes,
+                                                               self.texture_header_formatting)
             # dict.copy, because python uses a reference when it doesn't need to
-            self.texture_header_list.append(dict.copy(texture_specific_header))
-            # print(texture_specific_header)
+            self.texture_header_list.append(dict.copy(subtexture_header))
 
-        def fill_tile_indexes(row, column, group_size):
-            if group_size > 1:
-                group_size = group_size // 2
-                fill_tile_indexes(row, column, group_size)  # Top Left
-                fill_tile_indexes(row + group_size, column, group_size)  # Bottom Left
-                fill_tile_indexes(row, column + group_size, group_size)  # Top Right
-                fill_tile_indexes(row + group_size, column + group_size, group_size)  # Bottom Right
-            elif group_size == 1:
-                unpacked_index_list[row][column] = index_bytes[self.index_counter]
-                self.index_counter += 1
+            texture_headers_offset += self.texture_header_size
 
-        # Fill tile_list and index_list
-        pixel_data_offset = 0x1000
-        texture_file.seek(pixel_data_offset)
+        self.add_palette_if_present(texture_file_bytes[:0x1000])
+
+        # print(self.texture_header_list)
+        subtexture_data_offset = 0x1000
         for texture_header in self.texture_header_list:
-            if texture_header["No Idea"] == 0:
-                texture_bytes = texture_file.read(texture_header["Image Size (in bytes)"])
 
-                index_size = ((texture_header["Image Width"] // 2) ** 2)
-                print(texture_header)
-                index_bytes = texture_bytes[-index_size:]
-                tile_bytes = texture_bytes[:-index_size]
+            if texture_header["Pixel Offset"] != 0:
+                subtexture_data_offset = texture_header["Pixel Offset"]
 
-                split_tile_list = [tile_bytes[index*8:index*8+8] for index in range(len(tile_bytes)//8)]
-                print(len(split_tile_list))
+            subtexture_bytes = texture_file_bytes[subtexture_data_offset:
+                                                  subtexture_data_offset + texture_header["Image Size (in bytes)"]]
 
-                self.tile_list.append(split_tile_list)
-                self.index_list.append(index_bytes)
+            complete_texture_size = (texture_header["Image Width"] * texture_header["Image Width"] * 16) // 8
+            unyakuzaed_size = int.from_bytes(subtexture_bytes[4:8], "little")
 
-                pixel_bytes = b''
-                unpacked_index_list = [[0 for x in range(texture_header["Image Width"] // 2)] for y in range(texture_header["Image Width"] // 2)]
-                self.index_counter = 0
-                fill_tile_indexes(0, 0, texture_header["Image Width"] // 2)
+            # This trims first 16 bytes, since they are an "archive" header
+            if texture_header["Compressed"] == 1:
+                subtexture_bytes = uncompress_SR2_subtexture(subtexture_bytes)
 
-                # Fill pixel_bytes_list
-                for row in unpacked_index_list:
-                    print(row)
-                    first_line = b''
-                    second_line = b''
-                    for index in row:
-                        first_line += split_tile_list[index][:2] + split_tile_list[index][4:6]
-                        second_line += split_tile_list[index][2:4] + split_tile_list[index][6:8]
+            paletted = texture_header["Color Format"] > 1024
 
-                    pixel_bytes += first_line
-                    pixel_bytes += second_line
-            if texture_header["No Idea"] == 1:
-                texture_bytes = texture_file.read(texture_header["Image Size (in bytes)"])
-                pixel_bytes = texture_bytes
+            #print(texture_header)
+
+            # Fill tile_list and index_list
+            if paletted:
+                # No tiles, palette indexes in their place
+                self.flat_index_list = list.copy([subtexture_bytes[index] for index in range(len(subtexture_bytes))])
+                tile_bytes = subtexture_bytes
+            elif unyakuzaed_size == complete_texture_size:
+                # If it's just compressed, then every 2x2 fragment is a tile and go in sequential order
+                index_amount = (texture_header["Image Width"] // 2) ** 2
+                self.flat_index_list = list.copy([i for i in range(index_amount)])
+                tile_bytes = subtexture_bytes
+            else:
+                # If uses tile compression
+                index_bytes_size = ((texture_header["Image Width"] // 2) ** 2)
+                index_bytes = subtexture_bytes[-index_bytes_size:]
+                self.flat_index_list = list.copy([index_bytes[i] for i in range(index_bytes_size)])
+                tile_bytes = subtexture_bytes[:-index_bytes_size]
+
+            self.unpacked_index_list = [[0 for x in range(texture_header["Image Width"] // 2)] for y in
+                                        range(texture_header["Image Width"] // 2)]
+
+            if paletted:
+                pixel_bytes = self.assemble_paletted_pixel_bytes(texture_header)
+            else:
+                # Split tile_bytes into individual 2x2 16 bit tiles
+                individual_tile_list = [tile_bytes[index * 8:index * 8 + 8] for index in range(len(tile_bytes) // 8)]
+
+                self.tile_list.append(individual_tile_list)
+                self.index_list.append(self.flat_index_list)
+
+                pixel_bytes = self.assemble_pixel_bytes_from_tiles(texture_header, individual_tile_list)
+
+            subtexture_data_offset += texture_header["Image Size (in bytes)"]
 
             self.pixel_bytes_list.append(pixel_bytes)
+
+    # (Un)Twiddling
+    def untwiddle_flat_index_list_into_unpacked_index_list(self, row, column, group_size):
+        if group_size > 1:
+            group_size = group_size // 2
+            self.untwiddle_flat_index_list_into_unpacked_index_list(row, column, group_size)  # Top Left
+            self.untwiddle_flat_index_list_into_unpacked_index_list(row + group_size, column, group_size)  # Bottom Left
+            self.untwiddle_flat_index_list_into_unpacked_index_list(row, column + group_size, group_size)  # Top Right
+            self.untwiddle_flat_index_list_into_unpacked_index_list(row + group_size, column + group_size, group_size)  # Bottom Right
+        elif group_size == 1:
+            self.unpacked_index_list[row][column] = self.flat_index_list[self.index_counter]
+            self.index_counter += 1
+
+    def assemble_paletted_pixel_bytes(self, texture_header):
+
+        self.unpacked_index_list = [[0 for x in range(texture_header["Image Width"])] for y in
+                                    range(texture_header["Image Width"])]
+
+        self.index_counter = 0
+        self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"])
+
+        pixel_bytes = b''
+        # Fill pixel_bytes_list
+        for row in self.unpacked_index_list:
+            for index in row:
+                pixel_bytes += index.to_bytes(1, "little")
+
+        return pixel_bytes
+
+    def assemble_pixel_bytes_from_tiles(self, texture_header, individual_tile_list):
+
+        self.index_counter = 0
+        self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"] // 2)
+
+        pixel_bytes = b''
+        # Fill pixel_bytes_list
+        for row in self.unpacked_index_list:
+            # print(row)
+            first_line = b''
+            second_line = b''
+            for index in row:
+                first_line += individual_tile_list[index][:2] + individual_tile_list[index][4:6]
+                second_line += individual_tile_list[index][2:4] + individual_tile_list[index][6:8]
+
+            pixel_bytes += first_line
+            pixel_bytes += second_line
+
+        return pixel_bytes
 
     def pack_and_give(self):
 
@@ -434,21 +500,31 @@ class MTEX(SR2Texture):
         return file_header_bytes + texture_header_bytes + padding_bytes + all_pixel_bytes
 
     def setup_bmp(self, texture_id):
-        current_sub_texture = self.texture_header_list[texture_id]
+        current_subtexture_header = self.texture_header_list[texture_id]
         output_bmp = BMP()
 
-        output_bmp.image_header["BPP"] = 16
-        if (current_sub_texture["Color Format"] & 0b00001111) == 2:
-            output_bmp.swapColorFormat("ARGB1555")
-        elif (current_sub_texture["Color Format"] & 0b00001111) == 8:
-            output_bmp.swapColorFormat("ARGB4444")
+        output_bmp.set_resolution(current_subtexture_header["Image Width"],
+                                  current_subtexture_header["Image Width"])
+
+        paletted = current_subtexture_header["Color Format"] > 1024
+
+        if not paletted:
+            output_bmp.image_header["BPP"] = 16
+            if (current_subtexture_header["Color Format"] & 0b00001111) == 2:
+                output_bmp.swapColorFormat("ARGB1555")
+            elif (current_subtexture_header["Color Format"] & 0b00001111) == 8:
+                output_bmp.swapColorFormat("ARGB4444")
+            else:
+                output_bmp.swapColorFormat("RGB565")
         else:
-            output_bmp.swapColorFormat("RGB565")
+            output_bmp.color_table_bytes = self.palette_list[0]
+            output_bmp.image_header["BPP"] = 8
+            output_bmp.image_header["Color Count"] = 256
 
         return output_bmp
 
     def convert_bmp_headers_to_texture_header(self, bmp_input):
-        raise LookupError("MTEX textures can't be exported from bmps")
+        raise LookupError("MTEX textures can't be made from bmps")
         sub_texture_header = dict.copy(self.texture_header)
 
         sub_texture_header["Image Width"] = bmp_input.image_header["Image Width"]

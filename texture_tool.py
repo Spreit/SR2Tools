@@ -85,7 +85,8 @@ def convertTXRtoBMP(input_path, output_path, png_export=False):
 
         file_signature = open(texture_path, "rb").read(4)
 
-        if (file_signature != b'RTEX' and file_signature != b'RHBG') or (texture_path[-4:] == ".BIN" or texture_path[-4:] == ".bin"):
+        if ((file_signature != b'RTEX' and file_signature != b'RHBG' and file_signature != b'MTEX')
+                or (texture_path[-4:] == ".BIN" or texture_path[-4:] == ".bin")):
             print("Not a texture file/ Can't be exported")
             continue
 

@@ -207,6 +207,11 @@ class TextureTab:
         #
 
     def replace_subtexture_at_id(self, subtexture_id):
+
+        if self.unpacked_texture.file_header["Signature"] == b"MTEX":
+            tkinter.messagebox.showwarning(title="Warning", message="MTEX textures can't be edited through GUI.")
+            return
+
         image_path = filedialog.askopenfilename(filetypes=sr2_file_types["Images"])
 
         if image_path == "":
@@ -281,8 +286,8 @@ class TextureTab:
             with open(texture_path, 'r+b') as f:
                 file_signature = f.read(4)
 
-                if file_signature == b'RTXR' or file_signature == b'MTEX':
-                    tkinter.messagebox.showerror(title="Error", message="Can't open RTXR textures. MTEX can be partially exported through code.")
+                if file_signature == b'RTXR':
+                    tkinter.messagebox.showerror(title="Error", message="Can't open RTXR textures.")
                     return
 
             # Convert subtextures into BMP and PNG for export and preview
