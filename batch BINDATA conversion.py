@@ -35,10 +35,10 @@ def packBINDATAtextures(unpacked_bindata_folder, pack_textures_to_folder, png_in
 # To unpack as PNG change png_export=False to png_export=True
 bindata_folder = "./BINDATA/"
 bindata_output_folder = "./Extracted BINDATA bmp/"
-# unpackBINDATA(bindata_folder, bindata_output_folder, png_export=False)
+# unpackBINDATAtextures(bindata_folder, bindata_output_folder, png_export=False)
 
 # Repack extracted textures
 # To pack PNGs instead of BMPs change png_input=False to png_input=True
 unpacked_bindata_folder = "./Extracted BINDATA bmp/"
 pack_textures_to_folder = "./Packed BINDATA bmp/"
-# packBINDATA(unpacked_bindata_folder, pack_textures_to_folder, png_input=False)
+# packBINDATAtextures(unpacked_bindata_folder, pack_textures_to_folder, png_input=False)
