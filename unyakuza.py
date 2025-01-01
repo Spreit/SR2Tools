@@ -51,13 +51,4 @@ def unyakuza(input_data: bytes, src_size: int, dest_size: int) -> bytes:
     return bytearray(decomp_buff)
 
 
-def uncompress_SR2_subtexture(subtexture_bytes) -> bytes:
-    compression_header = subtexture_bytes[:16]
-    # Mini header
-    uncompressed_size = int.from_bytes(compression_header[4:8], "little")
-    compressed_size = int.from_bytes(compression_header[8:12], "little")
 
-    subtexture_bytes = unyakuza(subtexture_bytes[16:], compressed_size - 16, uncompressed_size)
-    subtexture_bytes = bytes(subtexture_bytes)
-
-    return subtexture_bytes

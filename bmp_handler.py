@@ -1,4 +1,7 @@
-# BMP Class
+"""
+Python class for handling BMP files.
+V5 BMP specifically (created by GIMP), since it supports transparency.
+"""
 import struct
 
 BITMAPFILEHEADER = {
@@ -39,32 +42,24 @@ BITMAPV5HEADER = {
     "Reserved2": 0,
 }
 
-ColorTable = {
-    "Color0": [b'00F0', 4],
-    "Color1": [b'E000', 4],
-    "Color15": [b'0000', 4],
-    "Color16": [b'E000', 4]
-}
 
-
-def fill_dict_from_bytes_by_format(dictionary: dict, source_bytes: bytes, formatting: str) -> dict:
+def fill_dict_from_bytes_by_formatting(dictionary: dict, source_bytes: bytes, formatting: str) -> dict:
     value_list = struct.unpack(formatting, source_bytes)
     dictionary = dict(zip(dictionary.keys(), value_list))
     return dictionary
 
 
-class BMP:
+class BMPv5:
     def __init__(self):
         # Header structure
-        self.file_header_size = 14
-        self.bmp_file_header_format = "<2s3I"  # 14
-
-        self.image_header_size = 124
-        self.bmp_image_header_format = "<2Ii2hI" + "I2i2I" + "4I" + "4s36x4I" + "3I"  # 124
-
-        # Content
+        self.FILE_HEADER_SIZE = 14
+        self.BMP_FILE_HEADER_FORMATTING = "<2s3I"  # 14
         self.file_header = dict.copy(BITMAPFILEHEADER)
+
+        self.IMAGE_HEADER_SIZE = 124
+        self.BMP_IMAGE_HEADER_FORMATTING = "<2Ii2hI" + "I2i2I" + "4I" + "4s36x4I" + "3I"  # 124
         self.image_header = dict.copy(BITMAPV5HEADER)
+
         self.color_table_bytes = b''
         self.pixel_bytes = b''
 
@@ -109,13 +104,13 @@ class BMP:
                 return "Other"
 
     def update_file_size_and_pixel_offset(self):
-        self.file_header["File Size"] = (self.file_header_size
-                                         + self.image_header_size
+        self.file_header["File Size"] = (self.FILE_HEADER_SIZE
+                                         + self.IMAGE_HEADER_SIZE
                                          + len(self.color_table_bytes)
                                          + len(self.pixel_bytes))
 
-        self.file_header["Offset to PixelArray"] = (self.file_header_size
-                                                    + self.image_header_size
+        self.file_header["Offset to PixelArray"] = (self.FILE_HEADER_SIZE
+                                                    + self.IMAGE_HEADER_SIZE
                                                     + len(self.color_table_bytes))
 
     def swapColorFormat(self, color_format):
@@ -139,17 +134,17 @@ class BMP:
 
     def unpack_from_bytes(self, bitmap_bytes):
 
-        self.file_header = fill_dict_from_bytes_by_format(self.file_header,
-                                                          bitmap_bytes[:self.file_header_size],
-                                                          self.bmp_file_header_format)
+        self.file_header = fill_dict_from_bytes_by_formatting(self.file_header,
+                                                          bitmap_bytes[:self.FILE_HEADER_SIZE],
+                                                              self.BMP_FILE_HEADER_FORMATTING)
 
-        self.image_header = fill_dict_from_bytes_by_format(self.image_header,
-                                                           bitmap_bytes[self.file_header_size:self.file_header_size + self.image_header_size],
-                                                           self.bmp_image_header_format)
+        self.image_header = fill_dict_from_bytes_by_formatting(self.image_header,
+                                                           bitmap_bytes[self.FILE_HEADER_SIZE:self.FILE_HEADER_SIZE + self.IMAGE_HEADER_SIZE],
+                                                               self.BMP_IMAGE_HEADER_FORMATTING)
 
         # Read palette if present
-        if self.file_header["Offset to PixelArray"] - (self.file_header_size + self.image_header_size) > 0:
-            self.color_table_bytes = bitmap_bytes[self.file_header_size + self.image_header_size:self.file_header["Offset to PixelArray"]]
+        if self.file_header["Offset to PixelArray"] - (self.FILE_HEADER_SIZE + self.IMAGE_HEADER_SIZE) > 0:
+            self.color_table_bytes = bitmap_bytes[self.FILE_HEADER_SIZE + self.IMAGE_HEADER_SIZE:self.file_header["Offset to PixelArray"]]
 
         self.pixel_bytes = bitmap_bytes[self.file_header["Offset to PixelArray"]:]
 
@@ -159,16 +154,16 @@ class BMP:
         self.unpack_from_bytes(bitmap_bytes)
         bitmap_file.close()
 
-    def pack_and_give(self):
+    def pack_and_return(self):
         self.update_file_size_and_pixel_offset()
 
-        file_header_bytes = struct.pack(self.bmp_file_header_format, *list(self.file_header.values()))
-        image_header_bytes = struct.pack(self.bmp_image_header_format, *list(self.image_header.values()))
+        file_header_bytes = struct.pack(self.BMP_FILE_HEADER_FORMATTING, *list(self.file_header.values()))
+        image_header_bytes = struct.pack(self.BMP_IMAGE_HEADER_FORMATTING, *list(self.image_header.values()))
 
         return file_header_bytes + image_header_bytes + self.color_table_bytes + self.pixel_bytes
 
     def save(self, output_path):
-        bin_data = self.pack_and_give()
+        bin_data = self.pack_and_return()
 
         output_file = open(output_path, "w+b")
         output_file.write(bin_data)

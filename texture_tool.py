@@ -3,7 +3,7 @@ import os
 from texture_classes import *
 from PIL import Image
 import numpy
-import bmp_to_png
+import bmp_png_conversion
 
 
 def detect_texture_type(input_texture_path: str):
@@ -110,7 +110,7 @@ def convertTXRtoBMP(input_path, output_path, png_export=False):
 
             if png_export:
                 png_formated_path = bmp_formated_path[:-3] + "png"
-                png = bmp_to_png.BMPtoPNG(output_bmp)
+                png = bmp_png_conversion.BMPtoPNG(output_bmp)
                 png.save(png_formated_path)
                 print("Saved " + png_formated_path)
             else:
@@ -189,9 +189,9 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
             if png_input:
                 probably_correct_texture_format = guessTXRformatfromPNG(image_path)
                 png_input = Image.open(image_path)
-                bmp_input = bmp_to_png.PNGtoBMP(png_input, probably_correct_texture_format)
+                bmp_input = bmp_png_conversion.PNGtoBMP(png_input, probably_correct_texture_format)
             else:
-                bmp_input = BMP()
+                bmp_input = BMPv5()
                 bmp_input.unpack_from_file(image_path)
 
             if output_format == b'RHBG':

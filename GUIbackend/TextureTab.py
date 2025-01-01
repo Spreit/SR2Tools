@@ -6,12 +6,13 @@ import PIL.Image
 from PIL import ImageTk
 
 from GUIbackend.file_helpers import *
-from bmp_to_png import *
+from bmp_png_conversion import *
 from texture_tool import *
 
 import multiprocessing
 
 png_converter_pool = multiprocessing.Pool()
+
 
 class TextureTab:
     def __init__(self, tab_control):
@@ -224,7 +225,7 @@ class TextureTab:
             png = PIL.Image.open(image_path)
             bmp = PNGtoBMP(png, subtexture_format)
         elif image_path[-3:] == "bmp":
-            bmp = BMP()
+            bmp = BMPv5()
             bmp.unpack_from_file(image_path)
             png = BMPtoPNG(bmp)
         else:
