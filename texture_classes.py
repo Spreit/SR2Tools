@@ -1,6 +1,6 @@
 # Classes of SR2 texture formats
 import struct
-from bmp_handler import *
+from bmp_handler import BMP
 from unyakuza import uncompress_SR2_subtexture
 
 def fill_dict_from_bytes_by_format(dictionary: dict, source_bytes: bytes, formatting: str) -> dict:

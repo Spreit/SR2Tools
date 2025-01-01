@@ -1,11 +1,16 @@
 # You would think that BMP would be supported in everything since it exists since forever, but nope.
 import numpy
 from PIL import Image
-from color_conversion import *
-from texture_tool import *
+import color_conversion
+from bmp_handler import BMP
 
 
 def BMPtoPNG(unpacked_bmp: BMP) -> Image:
+    """
+    Unpack BMP image using BMP class
+    Convert 16-bit pixel bytes into RGBA8888 array
+    Turn the array into PIL Image
+    """
     bmp_bpp = unpacked_bmp.image_header["BPP"]
     bmp_color_format = unpacked_bmp.check_color_format()
     bmp_pixel_bytes = unpacked_bmp.pixel_bytes
@@ -43,11 +48,11 @@ def BMPtoPNG(unpacked_bmp: BMP) -> Image:
     else:
         if bmp_bpp == 16:
             if bmp_color_format == "RGB565":
-                png_pixel_array = convertRGB565toRGBA8888(bmp_pixel_bytes)
+                png_pixel_array = color_conversion.convertRGB565toRGBA8888(bmp_pixel_bytes)
             elif bmp_color_format == "ARGB1555":
-                png_pixel_array = convertARGB1555toRGBA8888(bmp_pixel_bytes)
+                png_pixel_array = color_conversion.convertARGB1555toRGBA8888(bmp_pixel_bytes)
             elif bmp_color_format == "ARGB4444":
-                png_pixel_array = convertARGB4444toRGBA8888(bmp_pixel_bytes)
+                png_pixel_array = color_conversion.convertARGB4444toRGBA8888(bmp_pixel_bytes)
 
         elif bmp_bpp == 24:
             color_channel_count = 3
@@ -81,6 +86,11 @@ def BMPtoPNG(unpacked_bmp: BMP) -> Image:
 
 
 def PNGtoBMP(unpacked_png, output_color_format) -> BMP:
+    """
+    Turn PNG into pixel array
+    Convert the array into 16-bit pixel bytes
+    Assemble BMP out of it
+    """
     width, height = unpacked_png.size
     png_array = numpy.asarray(unpacked_png)
     numpy.flip(png_array)
@@ -90,11 +100,11 @@ def PNGtoBMP(unpacked_png, output_color_format) -> BMP:
     converted_pixel_bytes = b''
 
     if output_color_format == "RGB565":
-        converted_pixel_bytes = convertARGB8888toRGB565bytes(png_array)
+        converted_pixel_bytes = color_conversion.convertARGB8888toRGB565bytes(png_array)
     elif output_color_format == "ARGB1555":
-        converted_pixel_bytes = convertARGB8888toRGBA1555bytes(png_array)
+        converted_pixel_bytes = color_conversion.convertARGB8888toRGBA1555bytes(png_array)
     elif output_color_format == "ARGB4444":
-        converted_pixel_bytes = convertARGB8888toARGB4444bytes(png_array)
+        converted_pixel_bytes = color_conversion.convertARGB8888toARGB4444bytes(png_array)
 
     output_bmp = BMP()
     output_bmp.set_resolution(width, height)
