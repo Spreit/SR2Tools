@@ -179,7 +179,7 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
         for image_path in grouped_bmp_dict[bmp_group]:
 
             if png_input:
-                probably_correct_texture_format = guessTXRformatfromPNG(image_path)
+                probably_correct_texture_format = guessColorFormatfromPNG(image_path)
                 png_input = Image.open(image_path)
                 bmp_input = bmp_png_conversion.PNGtoBMP(png_input, probably_correct_texture_format)
             else:
@@ -247,34 +247,30 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
 # RGB565   - if all alpha channels are 255 or if there is no alpha channel
 # ARGB1555 - if alpha channel values are only either 255 or 0
 # ARGB4444 - else
-def guessTXRformatfromPNG(png_path):
+def guessColorFormatfromPNG(png_path):
     unpacked_png = Image.open(png_path)
     png_array = numpy.asarray(unpacked_png)
-    width, height, channel_count = png_array.shape
+    channel_count = png_array.shape[2]
 
     if channel_count == 3:
         return "RGB565"
 
-    a255_check = False
-    a0_check = False
+    alpha_array = png_array[:, :, 3]
 
-    for row in png_array:
-        for pixel in row:
-            alpha_value = pixel[3]
+    min_alpha_value = numpy.min(alpha_array)
 
-            if alpha_value == 255:
-                a255_check = True
+    if min_alpha_value == 255:
+        return "RGB565"
 
-            if alpha_value == 0:
-                a0_check = True
+    max_alpha_value = numpy.max(alpha_array)
 
-            if alpha_value>0 and alpha_value<255:
-                return "ARGB4444"
+    if min_alpha_value != 0 or max_alpha_value != 255:
+        return "ARGB4444"
 
-    if a255_check and a0_check:
+    if True in ((alpha_array > 0) & (alpha_array < 255)):
+        return "ARGB4444"
+    else:
         return "ARGB1555"
-
-    return "RGB565"
 
 
 def flip_pixel_bytes_vertically(pixel_bytes, image_width, image_height, bpp):
