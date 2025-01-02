@@ -40,16 +40,13 @@ def convertTXRtoBMPlist(input_texture_path: str) -> list:
             image_height = image_width
 
         output_bmp.set_resolution(image_width, image_height)
-
-        output_bmp.pixel_bytes = flip_pixel_bytes_vertically(input_texture.pixel_bytes_list[texture_id],
-                                                             image_width, image_height,
-                                                             output_bmp.image_header["BPP"])
+        output_bmp.pixel_bytes = input_texture.pixel_bytes_list[texture_id]
         output_bmp_list.append(output_bmp)
 
     return output_bmp_list
 
 
-# Smart path system
+# With smart path system
 def convertTXRtoBMP(input_path, output_path, png_export=False):
 
     if input_path == "":
@@ -95,14 +92,9 @@ def convertTXRtoBMP(input_path, output_path, png_export=False):
 
         for subtexture_id in range(len(input_texture_file.texture_header_list)):
 
-            # print(input_texture_file.texture_header_list[subtexture_id])
-
             output_bmp = input_texture_file.setup_bmp(subtexture_id)
 
-            output_bmp.pixel_bytes = flip_pixel_bytes_vertically(input_texture_file.pixel_bytes_list[subtexture_id],
-                                                                 output_bmp.image_header["Image Width"],
-                                                                 abs(output_bmp.image_header["Image Height"]),
-                                                                 output_bmp.image_header["BPP"])
+            output_bmp.pixel_bytes = input_texture_file.pixel_bytes_list[subtexture_id]
 
             bmp_formated_path = bmp_path + '.{}.bmp'.format(subtexture_id)
 
@@ -121,21 +113,21 @@ def convertTXRtoBMP(input_path, output_path, png_export=False):
 def convertBMPtoTXR(input_path, output_path, png_input=False):
 
     if png_input:
-        input_image_extention = ".png"
+        input_image_extension = ".png"
     else:
-        input_image_extention = ".bmp"
+        input_image_extension = ".bmp"
 
     input_image_list = []
 
     # Find all input images
     if os.path.isfile(input_path):
-        if input_path[input_path.rfind("."):] != input_image_extention:
+        if input_path[input_path.rfind("."):] != input_image_extension:
             print("Input file is not supported")
             return
         input_image_list.append(input_path)
     elif os.path.isdir(input_path):
         for filename in os.listdir(input_path):
-            if filename[filename.rfind("."):] == input_image_extention:
+            if filename[filename.rfind("."):] == input_image_extension:
                 input_image_list.append(input_path + filename)
     else:
         print(input_path)
@@ -197,10 +189,11 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
             if output_format == b'RHBG':
                 txr_output.convert_bmp_headers_to_texture_header(bmp_input)
 
-                bmp_input.pixel_bytes = flip_pixel_bytes_vertically(bmp_input.pixel_bytes,
-                                                                    bmp_input.image_header["Image Width"],
-                                                                    abs(bmp_input.image_header["Image Height"]),
-                                                                    bmp_input.image_header["BPP"])
+                if bmp_input.image_header["Image Height"] > 0:
+                    bmp_input.pixel_bytes = flip_pixel_bytes_vertically(bmp_input.pixel_bytes,
+                                                                        bmp_input.image_header["Image Width"],
+                                                                        abs(bmp_input.image_header["Image Height"]),
+                                                                        bmp_input.image_header["BPP"])
 
                 txr_output.pixel_bytes_list.append(bmp_input.pixel_bytes)
                 break

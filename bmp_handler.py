@@ -32,7 +32,7 @@ BITMAPV5HEADER = {
 
     "Color Space Type": b'BGRs',
     #"Color Space Endpoints": 0,  # 36 bytes, no idea what it does
-    "R Gamma": 1,
+    "R Gamma": 0,
     "G Gamma": 0,
     "B Gamma": 0,
     "Intent": 2,
@@ -66,11 +66,11 @@ class BMPv5:
         self.update_file_size_and_pixel_offset()
 
     def set_resolution(self, image_width, image_height):
-        self.image_header["Image Width"] = image_width
-        self.image_header["Image Height"] = image_height
+        self.image_header["Image Width"]  = image_width
+        self.image_header["Image Height"] = - image_height
 
         self.image_header["X Pixels Per Meter"] = image_width
-        self.image_header["Y Pixels Per Meter"] = image_height
+        self.image_header["Y Pixels Per Meter"] = - image_height
 
     def check_color_format(self):
         if self.image_header["Compression"] == 0:
@@ -113,22 +113,24 @@ class BMPv5:
                                                     + self.IMAGE_HEADER_SIZE
                                                     + len(self.color_table_bytes))
 
+        self.image_header["Image Size"] = len(self.pixel_bytes)
+
     def swapColorFormat(self, color_format):
         if color_format == "RGB565":
+            self.image_header["A Bitmask"] = 0b0000000000000000
             self.image_header["R Bitmask"] = 0b1111100000000000
             self.image_header["G Bitmask"] = 0b0000011111100000
             self.image_header["B Bitmask"] = 0b0000000000011111
-            self.image_header["A Bitmask"] = 0b0000000000000000
         elif color_format == "ARGB1555":
+            self.image_header["A Bitmask"] = 0b1000000000000000
             self.image_header["R Bitmask"] = 0b0111110000000000
             self.image_header["G Bitmask"] = 0b0000001111100000
             self.image_header["B Bitmask"] = 0b0000000000011111
-            self.image_header["A Bitmask"] = 0b1000000000000000
         elif color_format == "ARGB4444":
+            self.image_header["A Bitmask"] = 0b1111000000000000
             self.image_header["R Bitmask"] = 0b0000111100000000
             self.image_header["G Bitmask"] = 0b0000000011110000
             self.image_header["B Bitmask"] = 0b0000000000001111
-            self.image_header["A Bitmask"] = 0b1111000000000000
         else:
             raise ValueError("Incorrect BMP Color Format")
 

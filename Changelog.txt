@@ -9,6 +9,10 @@
 v0.6 - 
 - 3D support ?
 
+v0.5.4 - 2025-01-02
+- Lightning fast PNG<>BMP conversion
+- BMPs are now flipped properly by setting negative height
+
 v0.5.2 - 2024-12-XX
 - Fixed PNG flipping
 - Kinda full MTEX export (thanks to chmcl)

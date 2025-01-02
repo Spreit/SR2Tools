@@ -4,7 +4,7 @@ if __name__ == '__main__':
     from GUIbackend.TextureTab import *
 
     window = Tk()
-    window.title("Sega Rally 2 Modding Tools v0.5")
+    window.title("Sega Rally 2 Modding Tools v0.5.4")
     window.geometry('800x600')
 
     tab_control = ttk.Notebook(window)

@@ -1,4 +1,3 @@
-# Example script on how to use code interface
 import os.path
 from texture_tool import *
 
@@ -30,6 +29,7 @@ def packBINDATAtextures(unpacked_bindata_folder, pack_textures_to_folder, png_in
         # print(output_folder)
         os.makedirs(os.path.dirname(output_folder), exist_ok=True)
         convertBMPtoTXR(input_folder + '/', output_folder + '/', png_input)
+
 
 # Unpack all texture from the entire game directory and put them at bindata_output_folder (with folders)
 # To unpack as PNG change png_export=False to png_export=True
