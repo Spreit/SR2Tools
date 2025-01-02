@@ -411,8 +411,6 @@ class MTEX(SR2Texture):
 
             paletted = texture_header["Color Format"] > 1024
 
-            #print(texture_header)
-
             # Fill tile_list and index_list
             if paletted:
                 # No tiles, palette indexes in their place
@@ -435,6 +433,8 @@ class MTEX(SR2Texture):
 
             if paletted:
                 pixel_bytes = self.assemble_paletted_pixel_bytes(texture_header)
+            elif texture_header["Color Format"] == 0:
+                pixel_bytes = subtexture_bytes
             else:
                 # Split tile_bytes into individual 2x2 16 bit tiles
                 individual_tile_list = [tile_bytes[index * 8:index * 8 + 8] for index in range(len(tile_bytes) // 8)]
@@ -465,8 +465,11 @@ class MTEX(SR2Texture):
         self.unpacked_index_list = [[0 for x in range(texture_header["Image Width"])] for y in
                                     range(texture_header["Image Width"])]
 
-        self.index_counter = 0
-        self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"])
+        should_be_untwiddled = (texture_header["Color Format"] & 0b00100000) == 32
+
+        if should_be_untwiddled:
+            self.index_counter = 0
+            self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"])
 
         pixel_bytes = b''
         # Fill pixel_bytes_list
@@ -478,8 +481,11 @@ class MTEX(SR2Texture):
 
     def assemble_pixel_bytes_from_tiles(self, texture_header, individual_tile_list):
 
-        self.index_counter = 0
-        self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"] // 2)
+        should_be_untwiddled = (texture_header["Color Format"] & 0b00100000) == 32
+
+        if should_be_untwiddled:
+            self.index_counter = 0
+            self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"] // 2)
 
         pixel_bytes = b''
         # Fill pixel_bytes_list

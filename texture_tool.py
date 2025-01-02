@@ -84,7 +84,7 @@ def convertTXRtoBMP(input_path, output_path, png_export=False):
 
         if ((file_signature != b'RTEX' and file_signature != b'RHBG' and file_signature != b'MTEX')
                 or (texture_path[-4:] == ".BIN" or texture_path[-4:] == ".bin")):
-            print("Not a texture file/ Can't be exported")
+            print("Not a texture file / Can't be exported")
             continue
 
         input_texture_file = detect_texture_type(texture_path)
@@ -110,31 +110,27 @@ def convertTXRtoBMP(input_path, output_path, png_export=False):
                 print("Saved " + bmp_formated_path)
 
 
-def convertBMPtoTXR(input_path, output_path, png_input=False):
+def scanDirectoryForFilesByExtension(directory_path, file_extension):
+    file_list = []
 
-    if png_input:
-        input_image_extension = ".png"
-    else:
-        input_image_extension = ".bmp"
-
-    input_image_list = []
-
-    # Find all input images
-    if os.path.isfile(input_path):
-        if input_path[input_path.rfind("."):] != input_image_extension:
+    if os.path.isfile(directory_path):
+        if directory_path[directory_path.rfind("."):] != file_extension:
             print("Input file is not supported")
             return
-        input_image_list.append(input_path)
-    elif os.path.isdir(input_path):
-        for filename in os.listdir(input_path):
-            if filename[filename.rfind("."):] == input_image_extension:
-                input_image_list.append(input_path + filename)
+        file_list.append(directory_path)
+    elif os.path.isdir(directory_path):
+        for filename in os.listdir(directory_path):
+            if filename[filename.rfind("."):] == file_extension:
+                file_list.append(directory_path + filename)
     else:
-        print(input_path)
+        print(directory_path)
         raise ValueError("Invalid input file/folder")
 
-    input_image_list = sorted(input_image_list, key=len)
-    grouped_bmp_dict = {}
+    return file_list
+
+
+def groupImagesByFileName(input_image_list):
+    group_dictionary = {}
 
     # Group input images by their title
     # ./folder/input.txr.0.bmp -> ./folder/input.txr
@@ -143,13 +139,26 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
         index_dot = image_path[extension_dot + 1:].find(".") + 1
         texture_group_path = image_path[:extension_dot + index_dot]
 
-        if texture_group_path not in grouped_bmp_dict:
-            # print(texture_group_path)
-            grouped_bmp_dict[texture_group_path] = []
+        if texture_group_path not in group_dictionary:
+            group_dictionary[texture_group_path] = []
 
-        grouped_bmp_dict[texture_group_path].append(image_path)
+        group_dictionary[texture_group_path].append(image_path)
 
-    # print(grouped_bmp_dict)
+    return group_dictionary
+
+
+def convertBMPtoTXR(input_path, output_path, png_input=False):
+
+    if png_input:
+        input_image_extension = ".png"
+    else:
+        input_image_extension = ".bmp"
+
+    # Find all input images
+    input_image_list = scanDirectoryForFilesByExtension(input_path, input_image_extension)
+    input_image_list = sorted(input_image_list, key=len)
+
+    grouped_bmp_dict = groupImagesByFileName(input_image_list)
 
     for bmp_group in grouped_bmp_dict:
 
@@ -161,20 +170,17 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
         txr_output = RTEX()
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        texture_path = output_path
+        output_texture_path = output_path
 
-        if bmp_group[-3:] == ".bg" or bmp_group[-3:] == ".BG":
+        if ((bmp_group[-3:] == ".bg" or bmp_group[-3:] == ".BG")
+                or (output_path.find(".bg") or output_path.find(".BG"))):
             output_format = b'RHBG'
             txr_output = RHBG()
 
-        if os.path.isfile(output_path):
-            if output_path.find(".bg"):
-                output_format = b'RHBG'
-                txr_output = RHBG()
-        elif os.path.isdir(output_path):
-            texture_path = bmp_group.replace(input_path, output_path)
+        if os.path.isdir(output_path):
+            output_texture_path = bmp_group.replace(input_path, output_path)
         elif output_path == "":
-            texture_path = bmp_group
+            output_texture_path = bmp_group
 
         for image_path in grouped_bmp_dict[bmp_group]:
 
@@ -238,8 +244,8 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
 
             txr_output.add_texture(subtexture_texture_header, bmp_input.pixel_bytes)
 
-        txr_output.save(texture_path)
-        print("Saved " + texture_path)
+        txr_output.save(output_texture_path)
+        print("Saved " + output_texture_path)
 
 
 # SR2Tools-converted BMP have correct color formats, so you can just use check_color_format with them

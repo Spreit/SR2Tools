@@ -2,9 +2,10 @@ import tkinter
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
+from tkinter import *
 
-from GUIbackend.file_helpers import *
-from SARCextractor import *
+import GUIbackend.file_helpers
+from SARCextractor import SARC
 
 
 class SARCTab:
@@ -54,7 +55,7 @@ class SARCTab:
         self.sarc_tree.column(5, width=80)
 
     def preview_sarc_file(self):
-        choose_file_for_entry(self.input_sarc_file, sr2_file_types["SARC"])
+        GUIbackend.file_helpers.choose_file_for_entry(self.input_sarc_file, GUIbackend.file_helpers.sr2_file_types["SARC"])
 
         path_to_sarc = self.input_sarc_file.get()
 

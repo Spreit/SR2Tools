@@ -1,4 +1,4 @@
-from tkinter import *
+import tkinter
 from tkinter import filedialog
 
 sr2_file_types = {
@@ -11,11 +11,11 @@ sr2_file_types = {
 
 def choose_file_for_entry(entry_to_change, filetypes):
     file_path = filedialog.askopenfilename(filetypes=filetypes)
-    entry_to_change.delete(0, END)
+    entry_to_change.delete(0, tkinter.END)
     entry_to_change.insert(0, file_path)
 
 
 def choose_folder_for_entry(path_to_change):
     folder_path = filedialog.askdirectory() + "/"
-    path_to_change.delete(0, END)
+    path_to_change.delete(0, tkinter.END)
     path_to_change.insert(0, folder_path)

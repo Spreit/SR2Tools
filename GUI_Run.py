@@ -1,9 +1,11 @@
-
 if __name__ == '__main__':
-    from GUIbackend.SARCTab import *
-    from GUIbackend.TextureTab import *
+    import tkinter
+    from tkinter import ttk
 
-    window = Tk()
+    from GUIbackend.TextureTab import TextureTab
+    from GUIbackend.SARCTab import SARCTab
+
+    window = tkinter.Tk()
     window.title("Sega Rally 2 Modding Tools v0.5.4")
     window.geometry('800x600')
 

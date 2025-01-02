@@ -1,12 +1,13 @@
 import tkinter
 from tkinter import messagebox
 from tkinter import ttk
+from tkinter import *
 
 import PIL.Image
 from PIL import ImageTk
 
 from GUIbackend.file_helpers import *
-from bmp_png_conversion import *
+from bmp_png_conversion import BMPtoPNG, PNGtoBMP
 from texture_tool import *
 
 import multiprocessing
@@ -365,7 +366,7 @@ class TextureTab:
         if file is None:  # asksaveasfile return `None` if dialog closed with "cancel".
             return
 
-        # Why can't TKinter have an option to open a file as binary?
+        # Why can't tkinter have an option to open a file as binary?
         saved_file_path = file.name
         file.close()
         self.unpacked_texture.save(saved_file_path)
