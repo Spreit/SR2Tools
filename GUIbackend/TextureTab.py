@@ -325,6 +325,9 @@ class TextureTab:
         except:
             color_format_value = 0
 
+        if self.texture_file_format_value["text"] == "MTEX":
+            color_format_value = (current_texture_header["Color Format"] & 0b00001111)
+
         match color_format_value:
             case 0:
                 color_format_string = "RGB565"
