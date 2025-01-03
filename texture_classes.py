@@ -46,22 +46,6 @@ sr2_texture_formats = {
         }
     },
 
-    b'RTXR': {
-        "File Header Formatting":  "<4sI",
-        "File Header": {
-            "Signature": b'RTXR',
-            "Texture Count": 0,
-        },
-
-        "Texture Header Formatting": "<B3x3I",
-        "Texture Header": {
-            "Color Format": 0,
-            "Image Width": 0,
-            "Image Height": 0,
-            "Image Size (in bytes)": 0
-        }
-    },
-
     b'MTEX': {
         "File Header Formatting": "<4sI8x",
         "File Header": {
@@ -77,6 +61,22 @@ sr2_texture_formats = {
             "Image Width": 0,
             "Pixel Offset": 0,
             "Image Size (in bytes)": 0,
+        }
+    },
+
+    b'RTXR': {
+        "File Header Formatting":  "<4sI",
+        "File Header": {
+            "Signature": b'RTXR',
+            "Texture Count": 0,
+        },
+
+        "Texture Header Formatting": "<B3x3I",
+        "Texture Header": {
+            "Color Format": 0,
+            "Image Width": 0,
+            "Image Height": 0,
+            "Image Size (in bytes)": 0
         }
     }
 }
@@ -367,11 +367,12 @@ def unyakuza_subtexture(subtexture_bytes) -> bytes:
     # Mini header
     compression_header = subtexture_bytes[:16]
 
-    uncompressed_size = int.from_bytes(compression_header[4:8], "little")
-    compressed_size = int.from_bytes(compression_header[8:12], "little")
+    if int.from_bytes(compression_header[:4], "little") == 1:
+        uncompressed_size = int.from_bytes(compression_header[4:8], "little")
+        compressed_size = int.from_bytes(compression_header[8:12], "little")
 
-    subtexture_bytes = unyakuza(subtexture_bytes[16:], compressed_size - 16, uncompressed_size)
-    subtexture_bytes = bytes(subtexture_bytes)
+        subtexture_bytes = unyakuza(subtexture_bytes[16:], compressed_size - 16, uncompressed_size)
+        subtexture_bytes = bytes(subtexture_bytes)
 
     return subtexture_bytes
 
@@ -426,12 +427,6 @@ class MTEX(SR2Texture):
 
     def assemble_pixel_bytes_from_tiles(self, texture_header, individual_tile_list):
 
-        should_be_untwiddled = (texture_header["Color Format"] & 0b00100000) == 32
-
-        if should_be_untwiddled:
-            self.index_counter = 0
-            self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"] // 2)
-
         pixel_bytes = b''
         # Fill pixel_bytes_list
         for row in self.unpacked_index_list:
@@ -447,40 +442,66 @@ class MTEX(SR2Texture):
 
         return pixel_bytes
 
-    def unpack_from_bytes(self, texture_file_bytes):
-        self.fill_file_header_from_bytes(texture_file_bytes[:self.texture_header_size])
-        self.fill_texture_headers_from_bytes(texture_file_bytes[:0x1000])
-        self.MTEX_add_palette_if_present(texture_file_bytes[:0x1000])
-
-        # Just split the texture bytes
-        # self.fill_pixel_bytes_list(texture_file_bytes)
-
-        # Unyakuza, untwiddle, untile. Idk, make it presentable
-
+    def MTEX_fill_pixel_bytes_list(self, texture_file_bytes):
         subtexture_data_offset = 0x1000
         for texture_header in self.texture_header_list:
-
             if texture_header["Pixel Offset"] != 0:
                 subtexture_data_offset = texture_header["Pixel Offset"]
 
             subtexture_bytes = texture_file_bytes[subtexture_data_offset:
                                                   subtexture_data_offset + texture_header["Image Size (in bytes)"]]
 
-            complete_texture_size = (texture_header["Image Width"] * texture_header["Image Width"] * 16) // 8
-            unyakuzaed_size = int.from_bytes(subtexture_bytes[4:8], "little")
+            subtexture_data_offset += texture_header["Image Size (in bytes)"]
 
+            self.pixel_bytes_list.append(subtexture_bytes)
+
+    def uncompress_compressed_texture_bytes(self):
+        sub_texture_index = 0
+        for texture_header in self.texture_header_list:
             # This trims first 16 bytes, since they are an "archive" header
             if texture_header["Compressed"] == 1:
-                subtexture_bytes = unyakuza_subtexture(subtexture_bytes)
+                self.pixel_bytes_list[sub_texture_index] = unyakuza_subtexture(self.pixel_bytes_list[sub_texture_index])
+            sub_texture_index += 1
 
+    def unpack_from_bytes(self, texture_file_bytes):
+        self.fill_file_header_from_bytes(texture_file_bytes[:self.texture_header_size])
+        self.fill_texture_headers_from_bytes(texture_file_bytes[:0x1000])
+        self.MTEX_add_palette_if_present(texture_file_bytes[:0x1000])
+
+        # Just split the sub texture bytes
+        self.MTEX_fill_pixel_bytes_list(texture_file_bytes)
+
+        self.uncompress_compressed_texture_bytes()
+
+        # Unyakuza, untwiddle, untile. Idk, make it presentable
+        sub_texture_index = 0
+        for texture_header in self.texture_header_list:
+
+            # 0 - RGB565
+            # 2 - ARGB4444
+            # 8 - ARGB1555
+
+            twiddled = ((texture_header["Color Format"] & 0b11110000) >> 4)
+            twiddled = (twiddled == 2) or (twiddled == 8)
+
+            actual_color_format = (texture_header["Color Format"] & 0b00001111)
             paletted = texture_header["Color Format"] > 1024
+
+            # print(twiddled)
+            # print(sub_texture_index, "Actual Color Format:", actual_color_format, "Paletted?", paletted)
+
+            subtexture_bytes = self.pixel_bytes_list[sub_texture_index]
+
+            complete_texture_size = texture_header["Image Width"] * texture_header["Image Width"] * 2
+
+            # print("complete_texture_size", complete_texture_size, "pixel bytes size", len(subtexture_bytes))
 
             # Fill tile_list and index_list
             if paletted:
                 # No tiles, palette indexes in their place
                 self.flat_index_list = list.copy([subtexture_bytes[index] for index in range(len(subtexture_bytes))])
                 tile_bytes = subtexture_bytes
-            elif unyakuzaed_size == complete_texture_size:
+            elif len(subtexture_bytes) == complete_texture_size:
                 # If it's just compressed, then every 2x2 fragment is a tile and go in sequential order
                 index_amount = (texture_header["Image Width"] // 2) ** 2
                 self.flat_index_list = list.copy([i for i in range(index_amount)])
@@ -495,9 +516,13 @@ class MTEX(SR2Texture):
             self.unpacked_index_list = [[0 for x in range(texture_header["Image Width"] // 2)] for y in
                                         range(texture_header["Image Width"] // 2)]
 
+            if twiddled:
+                self.index_counter = 0
+                self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, texture_header["Image Width"] // 2)
+
             if paletted:
                 pixel_bytes = self.assemble_paletted_pixel_bytes(texture_header)
-            elif texture_header["Color Format"] == 0:
+            elif not twiddled:
                 pixel_bytes = subtexture_bytes
             else:
                 # Split tile_bytes into individual 2x2 16 bit tiles
@@ -508,9 +533,8 @@ class MTEX(SR2Texture):
 
                 pixel_bytes = self.assemble_pixel_bytes_from_tiles(texture_header, individual_tile_list)
 
-            subtexture_data_offset += texture_header["Image Size (in bytes)"]
-
-            self.pixel_bytes_list.append(pixel_bytes)
+            self.pixel_bytes_list[sub_texture_index] = pixel_bytes
+            sub_texture_index += 1
 
     def add_texture(self, generic_texture_header, pixel_bytes):
         self.texture_header_list.append(generic_texture_header)
@@ -535,18 +559,25 @@ class MTEX(SR2Texture):
 
         paletted = current_subtexture_header["Color Format"] > 1024
 
+        actual_color_format = (current_subtexture_header["Color Format"] & 0b00001111)
+
         if not paletted:
             output_bmp.image_header["BPP"] = 16
-            if (current_subtexture_header["Color Format"] & 0b00001111) == 2:
+            if actual_color_format == 2:
                 output_bmp.swapColorFormat("ARGB1555")
-            elif (current_subtexture_header["Color Format"] & 0b00001111) == 8:
+            elif actual_color_format == 8:
                 output_bmp.swapColorFormat("ARGB4444")
             else:
                 output_bmp.swapColorFormat("RGB565")
+
+            # For one of few textures that needs this exception
+            if current_subtexture_header["Color Format"] == 0:
+                output_bmp.swapColorFormat("ARGB1555")
         else:
             output_bmp.color_table_bytes = self.palette_list[0]
             output_bmp.image_header["BPP"] = 8
             output_bmp.image_header["Color Count"] = 256
+
 
         return output_bmp
 
