@@ -21,7 +21,7 @@ class TextureTab:
         tab_control.add(self.texture_tab, text='Texture Tab')
 
         self.bmp_texture_list = []  # For conversion and export
-        self.png_texture_list = []  # For export and display
+        self.png_texture_list = []  # For export and preview
 
         # Input row
         self.input_texture_file_title = ""
@@ -266,7 +266,10 @@ class TextureTab:
         except:
             pass
 
-        new_display_image = ImageTk.PhotoImage(self.png_texture_list[sub_texture_index])
+        image_preview = self.png_texture_list[sub_texture_index].copy()
+        image_preview.thumbnail((512, 512))
+
+        new_display_image = ImageTk.PhotoImage(image_preview)
         self.image_canvas.itemconfig(self.image_container, image=new_display_image)
         self.image_canvas.imgref = new_display_image
 
@@ -296,7 +299,7 @@ class TextureTab:
             self.bmp_texture_list = convertTXRtoBMPlist(texture_path)
             self.png_texture_list = [self.empty_image for i in range(len(self.bmp_texture_list))]
 
-            # Run proper PNG conversion in async mode, so you wouldn't have to wait for 10 minutes for 4k textures to load
+            # Run proper PNG conversion in async mode for even more speed
             self.pool_png_result = png_converter_pool.map_async(BMPtoPNG, self.bmp_texture_list)
             # Thought you still need to wait if you want previews
 
