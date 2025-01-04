@@ -169,18 +169,10 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
         output_format = b'RTEX'
         txr_output = RTEX()
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        output_texture_path = output_path
-
         if ((bmp_group[-3:] == ".bg" or bmp_group[-3:] == ".BG")
                 or (output_path.find(".bg") or output_path.find(".BG"))):
             output_format = b'RHBG'
             txr_output = RHBG()
-
-        if os.path.isdir(output_path):
-            output_texture_path = bmp_group.replace(input_path, output_path)
-        elif output_path == "":
-            output_texture_path = bmp_group
 
         for image_path in grouped_bmp_dict[bmp_group]:
 
@@ -204,14 +196,14 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
                 txr_output.pixel_bytes_list.append(bmp_input.pixel_bytes)
                 break
 
-            subtexture_texture_header = dict.copy(txr_output.texture_header)
-
             bmp_color_format = bmp_input.check_color_format()
 
             # Color Format
             if bmp_input.image_header["BPP"] > 16 or bmp_input.image_header["BPP"] < 8:
                 print(image_path)
                 raise TypeError("Only 16 bit textures are supported (RGB565, ARGB1555 or ARGB4444) or paletted 8bit")
+
+            subtexture_texture_header = dict.copy(txr_output.texture_header)
 
             if bmp_input.image_header["Compression"] == 0:
                 subtexture_texture_header["Color Format"] = 2
@@ -243,6 +235,15 @@ def convertBMPtoTXR(input_path, output_path, png_input=False):
                                                                     bmp_input.image_header["BPP"])
 
             txr_output.add_texture(subtexture_texture_header, bmp_input.pixel_bytes)
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        if os.path.isdir(output_path):
+            output_texture_path = bmp_group.replace(input_path, output_path)
+        elif output_path == "":
+            output_texture_path = bmp_group
+        else:
+            output_texture_path = output_path
 
         txr_output.save(output_texture_path)
         print("Saved " + output_texture_path)

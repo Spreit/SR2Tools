@@ -98,9 +98,6 @@ class SR2Texture:
 
         self.pixel_bytes_list = []
 
-    def unpack_from_bytes(self, texture_file_bytes):
-        pass
-
     def fill_file_header_from_bytes(self, texture_file_bytes):
         file_header_bytes = texture_file_bytes[:self.file_header_size]
 
@@ -141,6 +138,9 @@ class SR2Texture:
                                                pixel_bytes_offset + texture_header["Image Size (in bytes)"]]
             self.pixel_bytes_list.append(texture_bytes)
             pixel_bytes_offset += texture_header["Image Size (in bytes)"]
+
+    def unpack_from_bytes(self, texture_file_bytes):
+        pass
 
     def unpack_from_file(self, texture_file_path):
         texture_file = open(texture_file_path, "r+b")
