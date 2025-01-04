@@ -385,7 +385,9 @@ class MTEX(SR2Texture):
         self.tile_list = []
         self.index_list = []
         self.palette_list = []
+
         self.index_counter = 0  # For correct tile unpacking
+        self.unpacked_index_list = []
 
     def MTEX_add_palette_if_present(self, full_header_bytes):
         for texture_header in self.texture_header_list:
@@ -402,14 +404,13 @@ class MTEX(SR2Texture):
             self.untwiddle_flat_index_list_into_unpacked_index_list(row, column + group_size, group_size)  # Top Right
             self.untwiddle_flat_index_list_into_unpacked_index_list(row + group_size, column + group_size, group_size)  # Bottom Right
         elif group_size == 1:
-            self.unpacked_index_list[row][column] = self.flat_index_list[self.index_counter]
+            self.unpacked_index_list[row][column] = self.index_list[self.index_counter]
             self.index_counter += 1
 
     # (Un)Twiddling
-    def assemble_paletted_pixel_bytes(self, texture_header):
-
+    def assemble_paletted_pixel_bytes(self):
         pixel_bytes = b''
-        # Fill pixel_bytes_list
+
         for row in self.unpacked_index_list:
             for index in row:
                 pixel_bytes += index.to_bytes(1, "little")
@@ -461,9 +462,10 @@ class MTEX(SR2Texture):
 
         self.uncompress_compressed_texture_bytes()
 
-        # Unyakuza, untwiddle, untile. Idk, make it presentable
-        sub_texture_index = 0
-        for texture_header in self.texture_header_list:
+        # Untwiddle, untile. Idk, make it presentable
+        for sub_texture_index in range(len(self.texture_header_list)):
+
+            texture_header = self.texture_header_list[sub_texture_index]
 
             twiddled = ((texture_header["Color Format"] & 0b11110000) >> 4)
             twiddled = (twiddled == 2) or (twiddled == 8)
@@ -477,18 +479,18 @@ class MTEX(SR2Texture):
             # Fill tile_list and index_list
             if paletted:
                 # No tiles, palette indexes in their place
-                self.flat_index_list = list.copy([subtexture_bytes[index] for index in range(len(subtexture_bytes))])
+                self.index_list = list.copy([subtexture_bytes[index] for index in range(len(subtexture_bytes))])
                 tile_bytes = subtexture_bytes
             elif len(subtexture_bytes) == complete_texture_size:
                 # If it's just compressed, then every 2x2 fragment is a tile and go in sequential order
                 index_amount = (texture_header["Image Width"] // 2) ** 2
-                self.flat_index_list = list.copy([i for i in range(index_amount)])
+                self.index_list = list.copy([i for i in range(index_amount)])
                 tile_bytes = subtexture_bytes
             else:
                 # Regular 256 2x2 tile compression
                 index_bytes_size = ((texture_header["Image Width"] // 2) ** 2)
                 index_bytes = subtexture_bytes[-index_bytes_size:]
-                self.flat_index_list = list.copy([index_bytes[i] for i in range(index_bytes_size)])
+                self.index_list = list.copy([index_bytes[i] for i in range(index_bytes_size)])
                 tile_bytes = subtexture_bytes[:-index_bytes_size]
 
             if twiddled:
@@ -505,20 +507,19 @@ class MTEX(SR2Texture):
                 self.untwiddle_flat_index_list_into_unpacked_index_list(0, 0, unpack_index_list_size)
 
                 if paletted:
-                    pixel_bytes = self.assemble_paletted_pixel_bytes(texture_header)
+                    pixel_bytes = self.assemble_paletted_pixel_bytes()
                 else:
                     # Split tile_bytes into individual 2x2 16 bit tiles
                     individual_tile_list = [tile_bytes[index * 8:index * 8 + 8] for index in range(len(tile_bytes) // 8)]
 
                     self.tile_list.append(individual_tile_list)
-                    self.index_list.append(self.flat_index_list)
 
                     pixel_bytes = self.assemble_pixel_bytes_from_tiles(individual_tile_list)
             else:
+                # Simply compressed and not twiddled, then it's done
                 pixel_bytes = subtexture_bytes
 
             self.pixel_bytes_list[sub_texture_index] = pixel_bytes
-            sub_texture_index += 1
 
     def add_texture(self, generic_texture_header, pixel_bytes):
         self.texture_header_list.append(generic_texture_header)
