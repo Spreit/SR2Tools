@@ -597,14 +597,10 @@ class RTXR(SR2Texture):
         SR2Texture.__init__(self, b'RTXR')
         # Uses unknown compression
 
-    def uncompress_pixel_bytes(self):
-        pass
-
-    def unpack_from_bytes(self, texture_file_bytes):
-        self.fill_file_header_from_bytes(texture_file_bytes)
-
+    def RTXR_fill_texture_header_list_and_split_compressed_pixel_bytes(self, texture_file_bytes):
         texture_offset = self.file_header_size
         # Fill texture_header_list and pixel_bytes_list
+        # texture headers and pixel bytes are stored in pairs RIGHT after each other
         for i in range(self.file_header["Texture Count"]):
             texture_header = fill_dict_from_bytes_by_formatting(self.texture_header,
                                                                 texture_file_bytes[texture_offset:
@@ -621,6 +617,33 @@ class RTXR(SR2Texture):
             self.pixel_bytes_list.append(texture_bytes)
 
             texture_offset += texture_header["Image Size (in bytes)"]
+
+    '''
+    def RTXR_unyakuza_subtexture(self, texture_header, subtexture_bytes) -> bytes:
+
+        uncompressed_size = texture_header["Image Width"] * texture_header["Image Height"] * 2
+        compressed_size = texture_header["Image Size (in bytes)"]
+
+        subtexture_bytes = unyakuza(subtexture_bytes, compressed_size, uncompressed_size)
+        subtexture_bytes = bytes(subtexture_bytes)
+
+        return subtexture_bytes
+    '''
+
+    def uncompress_pixel_bytes(self):
+        for texture_index in range(len(self.texture_header_list)):
+            texture_header = self.texture_header_list[texture_index]
+            subtexture_bytes = self.pixel_bytes_list[texture_index]
+
+            # self.pixel_bytes_list[texture_index] = self.RTXR_unyakuza_subtexture(texture_header, subtexture_bytes)
+
+    def unpack_from_bytes(self, texture_file_bytes):
+        self.fill_file_header_from_bytes(texture_file_bytes)
+        self.RTXR_fill_texture_header_list_and_split_compressed_pixel_bytes(texture_file_bytes)
+
+        # Needs different decompression code
+        self.uncompress_pixel_bytes()
+
 
     def pack_and_return(self):
         # Texture Header and Compressed Pixel Bytes are stored in pairs
