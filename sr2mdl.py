@@ -81,7 +81,7 @@ SR2MDL_file_header_dict = {
     "File Size": 0,
     "Header Size": 0x20,
     "Relation Offset": 0,
-    "Unk1": 0,
+    "Road count": 0,
 
     "Unk2": 0,
     "Unk3": 0,
@@ -145,9 +145,9 @@ SR2MDL_draw_options = {
 SR2MDL_node_transform = {
     "Model Pointers Offset": 0,
     "Draw Options Offset": 0,
-
     "Node Index": 0,
     "unk_0x0C": 0.0,
+
     "unk_0x10": 0.0,
     "unk_0x14": 0.0,
     "unk_0x18": 0.0,
@@ -156,8 +156,8 @@ SR2MDL_node_transform = {
     "Position X": 0.0,
     "Position Y": 0.0,
     "Position Z": 0.0,
-
     "unk_0x2C": 0,
+
     "unk_0x30": 0,
     "unk_0x34": 0,
     "unk_0x38": 0,
@@ -166,8 +166,8 @@ SR2MDL_node_transform = {
     "Scale X": 0.0,
     "Scale Y": 0.0,
     "Scale Z": 0.0,
-
     "unk_0x4C": 0,
+
     "unk_0x50": 0,
     "unk_0x54": 0,
     "unk_0x58": 0,
@@ -184,6 +184,38 @@ SR2MDL_node_relation = {
     "unk_0x14 ": 0,
     "unk_0x18 ": 0,
     "unk_0x1C ": 0,
+}
+
+SR2MDL_Road = {
+    "Index": 0,
+    "Node Offset": 0,
+    "Unk_2": 0,
+    "Unk_3": 0,
+
+    "Unk_4": 0,
+    "Unk_5": 0,
+    "Unk_6": 0,
+    "Unk_7": 0,
+
+    "Unk_8": 0,
+    "Unk_9": 0,
+    "Unk_10": 0,
+    "Unk_11": 0,
+
+    "Unk_12": 0,
+    "Unk_13": 0,
+    "Unk_14": 0,
+    "Unk_15": 0,
+
+    "Unk_16": 0,
+    "Unk_17": 0,
+    "Unk_18": 0,
+    "Unk_19": 0,
+
+    "Unk_20": 0,
+    "Unk_21": 0,
+    "Unk_22": 0,
+    "Unk_23": 0,
 }
 
 
@@ -248,7 +280,8 @@ class Mesh:
             print("!!! MULTIPLE MATERIALS PRESENT !!!... or the data was read incorrectly")
 
         material_size_in_bytes = self.model_pointers["Material Count"] * 0x20
-        material_bytes = full_model_file_bytes[material_offset:material_offset + material_size_in_bytes]
+        material_bytes = full_model_file_bytes[material_offset:
+                                               material_offset + material_size_in_bytes]
 
         self.material = fill_dict_from_bytes_by_formatting(SR2MDL_material,
                                                            material_bytes,
@@ -383,13 +416,45 @@ class Mesh:
         return material_bytes + vertex_bytes + faces_bytes + model_pointers_bytes + draw_options_bytes
 
 
+some_data = {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.0,
+    "3": 0.0,
+
+    "4": 0.0,
+    "5": 0.0,
+    "6": 0.0,
+    "7": 0.0,
+}
+
+
+class SomeData:
+    format = '<8f'
+
+    def __init__(self):
+        self.data = dict.copy(some_data)
+
+    def unpack_from_bytes(self, data_bytes, offset):
+
+        some_data_bytes = data_bytes[offset:
+                                     offset + 0x20]
+
+        self.data = fill_dict_from_bytes_by_formatting(self.data,
+                                                       some_data_bytes,
+                                                       self.format)
+
+    def pack_and_return(self):
+        return struct.pack(self.format, *self.data.values())
+
+
 SR2Node_extra = {
-            "Offset": 0,
-            "Relation Offset": 0,
-            "Index": 0,
-            "Parent Index": -1,
-            "Child Index": -1
-        }
+        "Offset": 0,
+        "Relation Offset": 0,
+        "Index": 0,
+        "Parent Index": -1,
+        "Child Index": -1
+}
 
 
 class SR2Node:
@@ -406,6 +471,7 @@ class SR2Node:
 
         self.transform = {}
         self.relation = {}
+        self.some_data = {}
 
         self.mesh_offset = 0x00
         self.draw_ops_offset = 0x00
@@ -457,14 +523,36 @@ class SR2Node:
         return node_transform_bytes + node_relation_bytes
 
 
+class SR2RoadSegment:
+    format_road = "<24I"
+
+    def __init__(self):
+        self.road = dict.copy(SR2MDL_Road)
+        self.road_size = 0x60
+
+    # Included for speed
+    def unpack_from_road_bytes(self, road_bytes):
+        self.road = fill_dict_from_bytes_by_formatting(self.road,
+                                                       road_bytes,
+                                                       self.format_road)
+
+    def unpack_from_bytes(self, file_bytes, offset):
+        road_bytes = file_bytes[offset, offset + self.road_size]
+
+        self.road = fill_dict_from_bytes_by_formatting(self.road,
+                                                       road_bytes,
+                                                       self.format_road)
+
+
 class SR2MDL:
     def __init__(self):
         self.file_header = dict.copy(SR2MDL_file_header_dict)
         self.file_header_formatting = '<8I'
         self.file_header_size = struct.calcsize(self.file_header_formatting)
 
-        self.nodes = []
         self.meshes = []
+        self.nodes = []
+        self.roads = []
 
     def fill_file_header_from_bytes(self, model_file_bytes):
         file_header_bytes = model_file_bytes[:self.file_header_size]
@@ -473,11 +561,62 @@ class SR2MDL:
                                                               file_header_bytes,
                                                               self.file_header_formatting)
 
+    def unpack_level_model_from_bytes(self, model_file_bytes):
+        self.fill_file_header_from_bytes(model_file_bytes[:self.file_header_size])
+
+        node_transform_size = 0x60
+        node_relation_size = 0x20
+        node_size = node_relation_size + node_transform_size
+
+        # Read Road segment and relevant Nodes and then relevant Mesh
+
+        # Read Road segments
+        road_count = self.file_header["Road count"]
+        road_size_in_bytes = 0x60
+        road_offset = self.file_header["Relation Offset"] + 0x20
+
+        # All Road bytes, for speed
+        road_bytes_chunk = model_file_bytes[road_offset:
+                                            road_offset + road_size_in_bytes * road_count]
+
+        for road_offset_in_chunk in range(0, len(road_bytes_chunk), road_size_in_bytes):
+            new_road = SR2RoadSegment()
+
+            road_bytes = road_bytes_chunk[road_offset_in_chunk:
+                                          road_offset_in_chunk + road_size_in_bytes]
+
+            new_road.unpack_from_road_bytes(road_bytes)
+
+            self.roads.append(new_road)
+
+        # Read Node that Road references
+        # Then Mesh that Node references
+        for road in self.roads:
+            node_offset = road.road["Node Offset"]
+            node_bytes = model_file_bytes[node_offset:
+                                          node_offset + node_size]
+
+            new_node = SR2Node()
+            new_node.unpack_from_bytes(node_bytes)
+
+            self.nodes.append(new_node)
+
+            new_mesh = Mesh()
+
+            new_mesh.unpack_from_bytes(model_file_bytes, new_node.transform["Model Pointers Offset"])
+
+            self.meshes.append(new_mesh)
+
     def unpack_from_bytes(self, model_file_bytes):
         self.fill_file_header_from_bytes(model_file_bytes[:self.file_header_size])
 
         print('File size: {0:#X}'.format(self.file_header["File Size"]))
         print('Node offset: {0:#X}'.format(self.file_header["Relation Offset"]))
+
+        # Check if it's a level file
+        if self.file_header["File Size"] > self.file_header["Relation Offset"] + 0x20:
+            self.unpack_level_model_from_bytes(model_file_bytes)
+            return
 
         # Unpack node and related mesh
         # 1. Calculate the total size of nodes + mesh
@@ -486,109 +625,89 @@ class SR2MDL:
 
         node_transform_size = 0x60
         node_relation_size = 0x20
+        node_size = node_relation_size + node_transform_size
 
         total_mesh_node_size = self.file_header["Relation Offset"] + node_relation_size - self.file_header_size
 
-        # Unpack nodes and related mesh
-        # Some nodes are 0x20 instead of 0x80, small nodes have 0x00FFFFFF as first 4 bytes
+        # Unpack nodes and related mesh, if exist
+        # If a node has 0xFFFFFFFF at unk_0x0C, then it doesn't have mesh, but other data
 
         first_node_relation_offset = self.file_header["Relation Offset"]
 
         # MDL file header has the first node relation offset
         # Nodes after that are placed before the first one
 
-        total_node_mesh_size_left = total_mesh_node_size
+        bytes_left = total_mesh_node_size
         current_node_relation_offset = first_node_relation_offset
 
-        while total_node_mesh_size_left > 0:
+        while bytes_left > 0:
             print("\n")
-            print("Total bytes left : {}".format(total_node_mesh_size_left))
+            print("Total bytes left : {}".format(bytes_left))
+
+            mesh_present = True
 
             # Unpack node
-            # Check if it's a mini-node
-            relation_bytes = model_file_bytes[current_node_relation_offset:
-                                              current_node_relation_offset + node_relation_size]
-
-            relation = fill_dict_from_bytes_by_formatting(dict.copy(SR2MDL_node_relation),
-                                                          relation_bytes,
-                                                          "<8I")
             node = SR2Node()
 
-            # print(relation["Parent Offset"], 0x00FFFFFF)
+            node_bytes = model_file_bytes[current_node_relation_offset - node_transform_size:
+                                          current_node_relation_offset - node_transform_size + node_size]
+            node.unpack_from_bytes(node_bytes)
 
-            if (relation["Parent Offset"] == 0x00FFFFFF) or (relation["Parent Offset"] == 0x008D8DFF):
-                print("Mini Node Detected")
-                node_size = node_relation_size
-                node.relation = dict.copy(relation)
-            else:
-                node_size = node_relation_size + node_transform_size
-                node_bytes = model_file_bytes[current_node_relation_offset - node_transform_size:
-                                              current_node_relation_offset - node_transform_size + node_size]
-                node.unpack_from_bytes(node_bytes)
+            print("unk 0x0C value", node.transform["unk_0x0C"])
 
-            print("Node Size:", node_size)
+            if math.isnan(node.transform["unk_0x0C"]):
+                print("Node without Mesh detected")
+                mesh_present = False
 
             node.index = len(self.nodes)  # len(self.nodes) will increase as Nodes are added
 
-            if node_size == node_relation_size:
-                node.extra["Offset"] = current_node_relation_offset
-            elif node_size == node_relation_size + node_transform_size:
-                node.extra["Offset"] = current_node_relation_offset - node_transform_size
-
+            node.extra["Offset"] = current_node_relation_offset - node_transform_size
             node.extra["Relation Offset"] = current_node_relation_offset
 
             self.nodes.append(node)
 
             # Go back through the file
             current_node_relation_offset -= node_size
-            total_node_mesh_size_left -= node_size
+            bytes_left -= node_size
 
-            # Doesn't have mesh attached or something?
-            # Still needs to be included or else the game crashes
-            if node_size == 0x20:
-                continue
+            # Unpack mesh
+            if mesh_present:
+                mesh_offset = node.mesh_offset
 
-            """
-            if (math.isnan(node.transform["unk_0x0C"])  # NAN is 0xFFFFFFFF in float
-                    and node.transform["unk_0x2C"] == 0x00
-                    and node.transform["unk_0x30"] == 0x00):
-                continue
-            """
+                mesh = Mesh()
+                mesh.unpack_from_bytes(model_file_bytes, mesh_offset)
+                mesh.update_sizes()
 
-            if ((node.relation["unk_0x08"] == 1)
-                    and node.transform["unk_0x2C"] == 0x00
-                    and node.transform["unk_0x30"] == 0x00):
-                continue
+                bytes_left -= mesh.total_size
 
-                # Unpack mesh
-            mesh_offset = node.mesh_offset
+                self.meshes.append(mesh)
 
-            mesh = Mesh()
-            mesh.unpack_from_bytes(model_file_bytes, mesh_offset)
-            mesh.update_sizes()
+                print("Mesh at {}".format(current_node_relation_offset))
+                print("Mesh size: {}".format(mesh.total_size))
+            else:
+                some_data_size = 0x20
+                tmp_some_data = SomeData()
 
-            total_node_mesh_size_left -= mesh.total_size
+                tmp_some_data.unpack_from_bytes(model_file_bytes, node.transform["Model Pointers Offset"])
 
-            self.meshes.append(mesh)
+                # Attach to node, instead of array like mesh
+                node.some_data = tmp_some_data.data
 
-            print("Mesh at {}".format(current_node_relation_offset))
-            print("Mesh size: {}".format(mesh.total_size))
-            print("Total bytes left after substraction: {}".format(total_node_mesh_size_left))
+                bytes_left -= some_data_size
+
+            print("Total bytes left after substraction: {}".format(bytes_left))
 
         self.find_node_index_relations_by_node_relation_offsets()
 
         for node in self.nodes:
             print("\n")
-            if node.transform != {}:
-                print("Node Index", node.transform["Node Index"])
-            else:
-                print("Node without Index")
+            print("Node Index", node.transform["Node Index"])
             print("Parent Index", node.extra["Parent Index"])
             print("Child Index", node.extra["Child Index"])
 
     def find_node_index_relations_by_node_relation_offsets(self):
         # Find Node parent and sibling by index for easy offset calculation
-        print("\nFinding Relationships")
+        print("\nFinding Relationships between Nodes")
         for node_index, node in enumerate(self.nodes):
             for check_node_index, check_node in enumerate(self.nodes):
                 print("\n")
@@ -608,16 +727,7 @@ class SR2MDL:
             self.unpack_from_bytes(file_bytes)
 
     def calculate_total_node_size(self):
-        total_node_size = 0
-
-        for node in self.nodes:
-            # If it's a mini node
-            if node.transform == {}:
-                total_node_size += 0x20
-            else:
-                total_node_size += 0x80
-
-        return total_node_size
+        return len(self.nodes) * 0x80
 
     def update_sizes(self):
         """
@@ -635,11 +745,15 @@ class SR2MDL:
 
         total_node_size = self.calculate_total_node_size()
 
-        total_file_size = self.file_header_size + total_mesh_size + total_node_size
+        total_some_data_size = 0
+
+        for node in self.nodes:
+            if node.some_data != {}:
+                total_some_data_size += 0x20
+
+        total_file_size = self.file_header_size + total_mesh_size + total_some_data_size + total_node_size
 
         self.file_header["File Size"] = total_file_size
-
-        print()
 
     def update_relation_offset_in_header(self):
         self.update_sizes()
@@ -648,6 +762,10 @@ class SR2MDL:
 
         for mesh in self.meshes:
             first_node_relation_offset += mesh.total_size
+
+        for node in self.nodes:
+            if node.some_data != {}:
+                first_node_relation_offset += 0x20
 
         # Go the end of all nodes and then go back a little
         first_node_relation_offset += self.calculate_total_node_size()
@@ -670,16 +788,13 @@ class SR2MDL:
         for node_index in range(len(self.nodes)):
             node = self.nodes[node_index]
 
-            print(node_index, node.relation["Parent Offset"], 0x00FFFFFF)
-            if node.relation["Parent Offset"] != 0x00FFFFFF:
-                if node.transform != {}:
-                    print("Transform", node.transform["unk_0x0C"], float('-nan'))
-                    if not math.isnan(node.transform["unk_0x0C"]):
-                        mesh = self.meshes[node_index]
+            print("Transform", node.transform["unk_0x0C"], float('-nan'))
+            if not math.isnan(node.transform["unk_0x0C"]):
+                mesh = self.meshes[node_index]
 
-                        node.transform["Model Pointers Offset"] = (mesh.offset + mesh.sizes["Material"]
-                                                                   + mesh.sizes["Vertex"] + mesh.sizes["Face"])
-                        node.transform["Draw Options Offset"] = node.transform["Model Pointers Offset"] + 0x20
+                node.transform["Model Pointers Offset"] = (mesh.offset + mesh.sizes["Material"]
+                                                           + mesh.sizes["Vertex"] + mesh.sizes["Face"])
+                node.transform["Draw Options Offset"] = node.transform["Model Pointers Offset"] + 0x20
 
     def update_node_offsets(self):
         self.update_node_offset_to_model_pointers()
@@ -708,46 +823,44 @@ class SR2MDL:
         for mesh in self.meshes:
             total_mesh_and_header_size += mesh.total_size
 
+        for node in self.nodes:
+            if node.some_data != {}:
+                total_mesh_and_header_size += 0x20
+
         # Node offsets
         new_node_offset = total_mesh_and_header_size
 
         # Calculate new offset of each node (in reverse order since that's how they are stored)
+        node_size = 0x80
         for node_index in range(len(self.nodes) - 1, 0, -1):
             print("New node offset", new_node_offset)
-
-            if self.nodes[node_index].transform == {}:
-                node_size = 0x20
-            else:
-                node_size = 0x80
-
             self.nodes[node_index].extra["Offset"] = new_node_offset
             new_node_offset += node_size
 
         # Go through each node and fill in new offsets
         print(len(self.nodes))
         for node in self.nodes:
-            if node.transform != {}:
-                print("Updating offsets for Node", node.transform["Node Index"], "with offset", node.extra["Offset"])
+            print("Updating offsets for Node", node.transform["Node Index"], "with offset", node.extra["Offset"])
 
-                parent_index = node.extra["Parent Index"]
-                print("Parent Node index", parent_index)
+            parent_index = node.extra["Parent Index"]
+            print("Parent Node index", parent_index)
 
-                if node.extra["Parent Index"] != -1:
-                    print("Previous Parent Offset", node.relation["Parent Offset"])
+            if node.extra["Parent Index"] != -1:
+                print("Previous Parent Offset", node.relation["Parent Offset"])
 
-                    node.relation["Parent Offset"] = self.nodes[parent_index].extra["Offset"]
+                node.relation["Parent Offset"] = self.nodes[parent_index].extra["Offset"]
 
-                    print("New Parent offset", node.relation["Parent Offset"])
+                print("New Parent offset", node.relation["Parent Offset"])
 
-                child_index = node.extra["Child Index"]
-                print("Child Node index", child_index)
+            child_index = node.extra["Child Index"]
+            print("Child Node index", child_index)
 
-                if node.extra["Child Index"] != -1:
-                    print("Previous Child Offset", self.nodes[child_index].extra["Offset"])
+            if node.extra["Child Index"] != -1:
+                print("Previous Child Offset", self.nodes[child_index].extra["Offset"])
 
-                    node.relation["Child Offset"] = self.nodes[child_index].extra["Offset"]
+                node.relation["Child Offset"] = self.nodes[child_index].extra["Offset"]
 
-                    print("New Child offset", node.relation["Child Offset"])
+                print("New Child offset", node.relation["Child Offset"])
 
     def pack_file_header(self):
         return struct.pack(self.file_header_formatting, *self.file_header.values())
@@ -760,12 +873,17 @@ class SR2MDL:
         for mesh in self.meshes:
             mesh_bytes += mesh.pack_and_return()
 
+        some_data_bytes = b''
+        for node in self.nodes:
+            if node.some_data != {}:
+                some_data_bytes += struct.pack("<8f", *node.some_data.values())
+
         # Nodes are stored in the reverse order of the list
         node_bytes = b''
         for node in self.nodes:
             node_bytes = node.pack_and_return() + node_bytes
 
-        return header_bytes + mesh_bytes + node_bytes
+        return header_bytes + mesh_bytes + some_data_bytes + node_bytes
 
     def save(self, file_path):
         SR2MDL_bytes = self.pack_and_return()
@@ -789,9 +907,9 @@ def turnSR2MeshIntoBlenderMesh(model_mesh, bl_mesh):
         bl_vertex_array.append(bl_vertex)
         normals.append(vertex.normal)
         #flip V-coordinate
-        fliped_v = -(vertex.uv[1] - 1.0)
-        fliped_uv = [ vertex.uv[0], fliped_v ]
-        uvs.append(fliped_uv)
+        flipped_v = -(vertex.uv[1] - 1.0)
+        flipped_uv = [ vertex.uv[0], flipped_v ]
+        uvs.append(flipped_uv)
 
     for face_index in range(0, len(model_mesh.faces), 3):
         v0 = bl_vertex_array[model_mesh.faces[face_index]]
@@ -883,9 +1001,10 @@ def load(filepath: str, global_matrix: mathutils.Matrix):
             node_name = 'node_{0:04}'.format(index)
             bl_obj = bpy.data.objects.new(node_name, None)
 
-            if node.transform != {}:
+            if node.some_data != {}:
                 bl_obj["Node Transform"] = node.transform
                 bl_obj["Extra"] = node.extra
+                bl_obj["Some Data"] = node.some_data
 
             bl_obj["Node Relation"] = node.relation
             model_collection.objects.link(bl_obj)
@@ -972,15 +1091,14 @@ def save(output_folder_path: str):
         for bl_object in sr2_collection.objects:
             new_node = SR2Node()
 
-            try:
-                new_node.transform = bl_object["Node Transform"]
-            except:
-                pass
-
+            new_node.transform = bl_object["Node Transform"]
             new_node.relation = bl_object["Node Relation"]
 
             if bl_object.get("Extra"):
                 new_node.extra = bl_object["Extra"]
+
+            if bl_object.get("Some Data"):
+                new_node.some_data = bl_object["Some Data"]
 
             SR2_model.nodes.append(new_node)
 
