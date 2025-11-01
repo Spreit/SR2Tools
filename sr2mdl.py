@@ -1116,6 +1116,22 @@ def save(output_folder_path: str):
             new_node = SR2Node()
 
             new_node.transform = bl_object["Node Transform"]
+            # Apply Blender Inspector Values
+            locRotScale = bl_object.matrix_local.decompose()
+            # Position
+            new_node.transform["Position X"] = locRotScale[0][0]
+            new_node.transform["Position Y"] = locRotScale[0][1]
+            new_node.transform["Position Z"] = locRotScale[0][2]
+            # Rotation
+            euler = locRotScale[1].to_euler('XYZ')
+            new_node.transform["Scale X"] = euler[0]/math.pi*0x7FFF
+            new_node.transform["Scale Y"] = euler[1]/math.pi*0x7FFF
+            new_node.transform["Scale Z"] = euler[2]/math.pi*0x7FFF
+            # Scale
+            new_node.transform["Scale X"] = locRotScale[2][0]
+            new_node.transform["Scale Y"] = locRotScale[2][1]
+            new_node.transform["Scale Z"] = locRotScale[2][2]
+
             new_node.relation = bl_object["Node Relation"]
 
             if bl_object.get("Extra"):
