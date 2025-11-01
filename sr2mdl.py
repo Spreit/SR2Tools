@@ -158,9 +158,12 @@ SR2MDL_node_transform = {
     "Position Z": 0.0,
     "unk_0x2C": 0,
 
-    "unk_0x30": 0,
-    "unk_0x34": 0,
-    "unk_0x38": 0,
+    "Rotation X": 0,
+    "unk_0x32": 0,
+    "Rotation Y": 0,
+    "unk_0x36": 0,
+    "Rotation Z": 0,
+    "unk_0x3A": 0,
     "unk_0x3C": 0,
 
     "Scale X": 0.0,
@@ -458,7 +461,7 @@ SR2Node_extra = {
 
 
 class SR2Node:
-    format_transform = '<3I' + '5f' + '3f' + '5I' + '3f' + '5I'
+    format_transform = '<3I' + '5f' + '3f' + '1I' + '6H' + '1I' + '3f' + '5I'
     format_relation = '<8I'
 
     format = '<4I' + '4f' + '3f' + '5I' + '3f' + "5I" + '8I'
@@ -477,6 +480,7 @@ class SR2Node:
         self.draw_ops_offset = 0x00
 
         self.position = [0, 0, 0]
+        self.rotation = [0, 0, 0]
         self.scale = [0, 0, 0]
 
         # Put these values into a dictionary to be able to store it in the blender file
@@ -507,7 +511,9 @@ class SR2Node:
         self.position = [self.transform["Position X"],
                          self.transform["Position Y"],
                          self.transform["Position Z"]]
-
+        self.rotation = [self.transform["Rotation X"],
+                         self.transform["Rotation Y"],
+                         self.transform["Rotation Z"]]
         self.scale = [self.transform["Scale X"],
                       self.transform["Scale Y"],
                       self.transform["Scale Z"]]
@@ -669,6 +675,23 @@ class SR2MDL:
             # Go back through the file
             current_node_relation_offset -= node_size
             bytes_left -= node_size
+
+            # Doesn't have mesh attached or something?
+            # Still needs to be included or else the game crashes
+            if node_size == 0x20:
+                continue
+
+            """
+            if (math.isnan(node.transform["unk_0x0C"])  # NAN is 0xFFFFFFFF in float
+                    and node.transform["unk_0x2C"] == 0x00
+                    and node.transform["Rotation X"] == 0x00):
+                continue
+            """
+
+            if ((node.relation["unk_0x08"] == 1)
+                    and node.transform["unk_0x2C"] == 0x00
+                    and node.transform["Rotation X"] == 0x00):
+                continue
 
             # Unpack mesh
             if mesh_present:
@@ -963,13 +986,14 @@ def generate_mesh(node: SR2Node, model_mesh: Mesh, index: int, global_matrix: ma
     bl_obj.select_set(True)
     bl_mesh = bpy.context.object.data
 
-    # Apply position and scale
-    bl_obj.location = node.position
-    bl_obj.scale = node.scale
+    # Apply Transforms
+    euler = mathutils.Euler(mathutils.Vector((node.rotation[0]/0x7FFF*math.pi, node.rotation[1]/0x7FFF*math.pi, node.rotation[2]/0x7FFF*math.pi)), 'XYZ')
+    local_mtx = mathutils.Matrix.LocRotScale(node.position, euler, node.scale)
+    bl_obj.matrix_local = local_mtx
 
     turnSR2MeshIntoBlenderMesh(model_mesh, bl_mesh)
 
-    # Switch to Object Mode and do ???
+    # Switch to Object Mode and Applying Parent of Node Transform
     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     inv_mtx = mathutils.Matrix.inverted(global_matrix)
     bpy.context.object.matrix_world = inv_mtx @ bpy.context.object.matrix_world
@@ -1092,6 +1116,22 @@ def save(output_folder_path: str):
             new_node = SR2Node()
 
             new_node.transform = bl_object["Node Transform"]
+            # Apply Blender Inspector Values
+            locRotScale = bl_object.matrix_local.decompose()
+            # Position
+            new_node.transform["Position X"] = locRotScale[0][0]
+            new_node.transform["Position Y"] = locRotScale[0][1]
+            new_node.transform["Position Z"] = locRotScale[0][2]
+            # Rotation
+            euler = locRotScale[1].to_euler('XYZ')
+            new_node.transform["Scale X"] = euler[0]/math.pi*0x7FFF
+            new_node.transform["Scale Y"] = euler[1]/math.pi*0x7FFF
+            new_node.transform["Scale Z"] = euler[2]/math.pi*0x7FFF
+            # Scale
+            new_node.transform["Scale X"] = locRotScale[2][0]
+            new_node.transform["Scale Y"] = locRotScale[2][1]
+            new_node.transform["Scale Z"] = locRotScale[2][2]
+
             new_node.relation = bl_object["Node Relation"]
 
             if bl_object.get("Extra"):
