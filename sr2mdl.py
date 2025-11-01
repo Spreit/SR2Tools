@@ -987,13 +987,8 @@ def generate_mesh(node: SR2Node, model_mesh: Mesh, index: int, global_matrix: ma
     bl_mesh = bpy.context.object.data
 
     # Apply Transforms
-    mtx_position = mathutils.Matrix.Translation((node.position[0], node.position[1], node.position[2]))
-
     euler = mathutils.Euler(mathutils.Vector((node.rotation[0]/0x7FFF*math.pi, node.rotation[1]/0x7FFF*math.pi, node.rotation[2]/0x7FFF*math.pi)), 'XYZ')
-    mtx_rotation = euler.to_matrix()
-    mtx_rotation.resize_4x4()
-    mtx_scale = mathutils.Matrix.Scale(node.scale[0], 4, mathutils.Vector((1, 0, 0))) @ mathutils.Matrix.Scale(node.scale[1], 4, mathutils.Vector((0, 1, 0))) @ mathutils.Matrix.Scale(node.scale[2], 4, mathutils.Vector((0, 0, 1)))
-    local_mtx = mtx_position @ mtx_rotation @ mtx_scale
+    local_mtx = mathutils.Matrix.LocRotScale(node.position, euler, node.scale)
     bl_obj.matrix_local = local_mtx
 
     turnSR2MeshIntoBlenderMesh(model_mesh, bl_mesh)
