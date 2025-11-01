@@ -1228,7 +1228,7 @@ class LoadOperator(bpy.types.Operator):
 class SR2MDLSidebarPanel(bpy.types.Panel):
     """Creates a custom panel in the sidebar"""
     bl_label = "SR2 MDL"
-    bl_idname = "SR2_sidebar"
+    bl_idname = "OBJECT_PT_SR2_sidebar"
     bl_region_type = "UI"
     bl_space_type = "VIEW_3D"
     bl_category = "SR2MDL"
