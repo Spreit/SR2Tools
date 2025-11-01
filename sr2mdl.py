@@ -192,7 +192,7 @@ SR2MDL_node_relation = {
 SR2MDL_Road = {
     "Index": 0,
     "Node Offset": 0,
-    "Unk_2": 0,
+    "Node Offset LOD": 0,
     "Unk_3": 0,
 
     "Unk_4": 0,
@@ -215,7 +215,7 @@ SR2MDL_Road = {
     "Unk_18": 0,
     "Unk_19": 0,
 
-    "Unk_20": 0,
+    "Embed Texture Offset": 0,
     "Unk_21": 0,
     "Unk_22": 0,
     "Unk_23": 0,
@@ -599,19 +599,27 @@ class SR2MDL:
         # Then Mesh that Node references
         for road in self.roads:
             node_offset = road.road["Node Offset"]
-            node_bytes = model_file_bytes[node_offset:
-                                          node_offset + node_size]
+            node_offset_lod = road.road["Node Offset LOD"]
 
-            new_node = SR2Node()
-            new_node.unpack_from_bytes(node_bytes)
+            self.unpack_node_by_offset(model_file_bytes, node_offset)
 
-            self.nodes.append(new_node)
+            if node_offset_lod != 0:
+                self.unpack_node_by_offset(model_file_bytes, node_offset_lod)
 
-            new_mesh = Mesh()
+    def unpack_node_by_offset(self, model_file_bytes, node_offset):
+        node_bytes = model_file_bytes[node_offset:
+                                      node_offset + 0x80]
 
-            new_mesh.unpack_from_bytes(model_file_bytes, new_node.transform["Model Pointers Offset"])
+        new_node = SR2Node()
+        new_node.unpack_from_bytes(node_bytes)
 
-            self.meshes.append(new_mesh)
+        self.nodes.append(new_node)
+
+        new_mesh = Mesh()
+
+        new_mesh.unpack_from_bytes(model_file_bytes, new_node.transform["Model Pointers Offset"])
+
+        self.meshes.append(new_mesh)
 
     def unpack_from_bytes(self, model_file_bytes):
         self.fill_file_header_from_bytes(model_file_bytes[:self.file_header_size])
