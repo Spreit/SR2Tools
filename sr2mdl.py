@@ -56,7 +56,6 @@ Save function
     Missing
 - Update Node Scale and Position when saving
 - Material representation?
-- Special Node Handling (some MDL may not open)
 
     Usability
 - Add import button to Blender import submenu
@@ -64,6 +63,7 @@ Save function
     Textures
 - Auto load textures, if present
 - Auto flip the texture
+- Read level embedded textures
 
     QOL
 - Flip UVs for easy editing
@@ -73,7 +73,13 @@ Save function
 
 - Load entire car folder
 
-- Figure out how to open levels
+    Opening Levels
+- Figure out where to get offsets for the rest of the environment
+- Figure out Road values meaning
+- Figure out Kinda Pointers values meaning
+- Figure out what Node Indexes array is for
+- Figure out how to parse Nodes with 0xFFFFFFFF
+
 """
 
 
@@ -83,8 +89,8 @@ SR2MDL_file_header_dict = {
     "Relation Offset": 0,
     "Road count": 0,
 
-    "Unk2": 0,
-    "Unk3": 0,
+    "Node Indexes Size In Bytes": 0,
+    "Kinda Pointers Count": 0,
     "Unk4": 0,
     "Unk5": 0,
 }
@@ -219,6 +225,19 @@ SR2MDL_Road = {
     "Unk_21": 0,
     "Unk_22": 0,
     "Unk_23": 0,
+}
+
+
+SR2MDL_kinda_pointers = {
+    "Unk_0": 0,
+    "Unk_1": 0,
+    "Unk_2": 0,
+    "Unk_3": 0,
+
+    "Unk_4": 0,
+    "Unk_5": 0,
+    "Unk_6": 0,
+    "Unk_7": 0,
 }
 
 
@@ -551,6 +570,9 @@ class SR2RoadSegment:
 
 
 class SR2MDL:
+    node_indexes_format = "<{}I"
+    kinda_pointers_format = "<8I"
+
     def __init__(self):
         self.file_header = dict.copy(SR2MDL_file_header_dict)
         self.file_header_formatting = '<8I'
@@ -558,7 +580,14 @@ class SR2MDL:
 
         self.meshes = []
         self.nodes = []
+
+        # Present in level files
         self.roads = []
+        self.node_indexes = []
+        self.kinda_pointers = []
+        self.embedded_textures = []
+
+        self.embedded_textures_bytes = []
 
     def fill_file_header_from_bytes(self, model_file_bytes):
         file_header_bytes = model_file_bytes[:self.file_header_size]
@@ -567,19 +596,8 @@ class SR2MDL:
                                                               file_header_bytes,
                                                               self.file_header_formatting)
 
-    def unpack_level_model_from_bytes(self, model_file_bytes):
-        self.fill_file_header_from_bytes(model_file_bytes[:self.file_header_size])
-
-        node_transform_size = 0x60
-        node_relation_size = 0x20
-        node_size = node_relation_size + node_transform_size
-
-        # Read Road segment and relevant Nodes and then relevant Mesh
-
-        # Read Road segments
-        road_count = self.file_header["Road count"]
+    def unpack_road_segments_from_bytes(self, model_file_bytes, road_offset, road_count):
         road_size_in_bytes = 0x60
-        road_offset = self.file_header["Relation Offset"] + 0x20
 
         # All Road bytes, for speed
         road_bytes_chunk = model_file_bytes[road_offset:
@@ -595,6 +613,92 @@ class SR2MDL:
 
             self.roads.append(new_road)
 
+    def unpack_node_indexes_from_bytes(self, model_file_bytes, offset, node_indexes_size):
+        single_index_size = 4
+        node_indexes_count = node_indexes_size // single_index_size
+
+        node_indexes_bytes = model_file_bytes[offset:
+                                              offset + node_indexes_size]
+
+        node_indexes_formated = self.node_indexes_format.format(node_indexes_count)
+
+        self.node_indexes = struct.unpack(node_indexes_formated, node_indexes_bytes)
+
+    def unpack_kinda_pointers_from_bytes(self, model_file_bytes, offset, kinda_pointers_count):
+        """
+        Seem to come in groups
+
+        1 value - Pointer to vertex array of a Mesh
+        2 value - Pointer to start of face array of the same Mesh
+
+        4 value - A node index? Just index?
+
+        Next in the same group
+        1 value - same pointer as before
+        2 value - same pointer as before, but slightly larger. Doesn't seem to point to something correctly. Doesn't make sense
+        """
+
+        single_kinda_pointers_size = struct.calcsize(self.kinda_pointers_format)
+
+        kinda_pointers_offset = offset
+        for i in range(kinda_pointers_count):
+            kinda_pointers_bytes = model_file_bytes[kinda_pointers_offset:
+                                                    kinda_pointers_offset + single_kinda_pointers_size]
+
+            unpacked_kinda_pointers = struct.unpack(self.kinda_pointers_format, kinda_pointers_bytes)
+            self.kinda_pointers.append(unpacked_kinda_pointers)
+
+            kinda_pointers_offset += single_kinda_pointers_size
+
+    def unpack_embedded_textures_from_bytes(self, model_file_bytes, starting_offset):
+        # Split by their sizes, actual texture handling should be carried by texture classes
+
+        # Width, Height, pixel bytes (RGB565)
+        current_texture_offset = starting_offset
+        end_of_file_offset = len(model_file_bytes)
+
+        if current_texture_offset >= end_of_file_offset:
+            return
+
+        header_size_in_bytes = 8
+        header_formatting = "<2I"
+
+        while True:
+            header_bytes = model_file_bytes[current_texture_offset:
+                                            current_texture_offset + header_size_in_bytes]
+
+            temp_header = struct.unpack(header_formatting, header_bytes)
+
+            width = temp_header[0]
+            height = temp_header[1]
+
+            if (width == 0) or (height == 0):
+                break
+
+            pixel_data_size_in_bytes = width * height * 2  # 16 // 8
+
+            texture_bytes = model_file_bytes[current_texture_offset:
+                                             current_texture_offset + pixel_data_size_in_bytes + header_size_in_bytes]
+            self.embedded_textures_bytes.append(texture_bytes)
+
+            current_texture_offset += header_size_in_bytes + pixel_data_size_in_bytes
+            if current_texture_offset >= end_of_file_offset:
+                break
+
+    def unpack_level_model_from_bytes(self, model_file_bytes):
+        self.fill_file_header_from_bytes(model_file_bytes[:self.file_header_size])
+
+        node_transform_size = 0x60
+        node_relation_size = 0x20
+        node_size = node_relation_size + node_transform_size
+
+        # Read Road segments
+        road_count = self.file_header["Road count"]
+        road_size_in_bytes = 0x60
+        road_offset = self.file_header["Relation Offset"] + 0x20
+
+        self.unpack_road_segments_from_bytes(model_file_bytes, road_offset, road_count)
+
         # Read Node that Road references
         # Then Mesh that Node references
         for road in self.roads:
@@ -605,6 +709,15 @@ class SR2MDL:
 
             if node_offset_lod != 0:
                 self.unpack_node_by_offset(model_file_bytes, node_offset_lod)
+
+        node_indexes_offset = road_offset + road_size_in_bytes * road_count
+        self.unpack_node_indexes_from_bytes(model_file_bytes, node_indexes_offset, self.file_header["Node Indexes Size In Bytes"])
+
+        kinda_pointer_offset = node_indexes_offset + self.file_header["Node Indexes Size In Bytes"]
+        self.unpack_kinda_pointers_from_bytes(model_file_bytes, kinda_pointer_offset, self.file_header["Kinda Pointers Count"])
+
+        embedded_textures_offset = kinda_pointer_offset + self.file_header["Kinda Pointers Count"] * 32
+        self.unpack_embedded_textures_from_bytes(model_file_bytes, embedded_textures_offset)
 
     def unpack_node_by_offset(self, model_file_bytes, node_offset):
         node_bytes = model_file_bytes[node_offset:
