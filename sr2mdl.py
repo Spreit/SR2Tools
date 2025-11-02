@@ -780,7 +780,7 @@ class SR2MDL:
                                           current_node_relation_offset - node_transform_size + node_size]
             node.unpack_from_bytes(node_bytes)
 
-            print("unk 0x0C value", node.transform["unk_0x0C"])
+            print("unk 0x0C value {0}".format(node.transform["unk_0x0C"]))
 
             if math.isnan(node.transform["unk_0x0C"]):
                 print("Node without Mesh detected")
@@ -826,8 +826,8 @@ class SR2MDL:
 
                 self.meshes.append(mesh)
 
-                print("Mesh at {}".format(current_node_relation_offset))
-                print("Mesh size: {}".format(mesh.total_size))
+                print("Mesh at {0:#X}".format(current_node_relation_offset))
+                print("Mesh size: {0:#X}".format(mesh.total_size))
             else:
                 some_data_size = 0x20
                 tmp_some_data = SomeData()
@@ -855,9 +855,9 @@ class SR2MDL:
         for node_index, node in enumerate(self.nodes):
             for check_node_index, check_node in enumerate(self.nodes):
                 print("\n")
-                print("Parent Offset", self.nodes[node_index].relation["Parent Offset"])
-                print("Child Offset", self.nodes[node_index].relation["Child Offset"])
-                print("Check Node offset",  check_node.extra["Offset"])
+                print("Parent Offset {0:X}".format(self.nodes[node_index].relation["Parent Offset"]))
+                print("Child Offset {0:#X}".format(self.nodes[node_index].relation["Child Offset"]))
+                print("Check Node offset {0:#X}".format(check_node.extra["Offset"]))
 
                 if check_node.extra["Offset"] == self.nodes[node_index].relation["Parent Offset"]:
                     self.nodes[node_index].extra["Parent Index"] = check_node_index
@@ -1341,7 +1341,7 @@ class LoadOperator(bpy.types.Operator):
 class SR2MDLSidebarPanel(bpy.types.Panel):
     """Creates a custom panel in the sidebar"""
     bl_label = "SR2 MDL"
-    bl_idname = "SR2_sidebar"
+    bl_idname = "OBJECT_PT_SR2_sidebar"
     bl_region_type = "UI"
     bl_space_type = "VIEW_3D"
     bl_category = "SR2MDL"
